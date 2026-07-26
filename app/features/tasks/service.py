@@ -1,19 +1,19 @@
-"""Tasks service.
-
-Runs the orchestrator and reconstructs a list of ``TaskStep`` records from the
-post-run message history: each tool call (``ToolCallPart``) is paired with the
-matching tool return (``ToolReturnPart``) by ``tool_call_id``.
-"""
-
 from __future__ import annotations
 
-from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    ToolCallPart,
+    ToolReturnPart,
+)
 
 from app.features.tasks.orchestrator import run_limits, tasks_agent
 from app.features.tasks.schemas import TaskStep
 
 
-async def run_task(goal: str, max_steps: int) -> tuple[str, list[TaskStep], dict[str, int]]:
+async def run_task(
+    goal: str, max_steps: int
+) -> tuple[str, list[TaskStep], dict[str, int]]:
     async with tasks_agent:
         result = await tasks_agent.run(goal, usage_limits=run_limits(max_steps))
 
@@ -21,11 +21,15 @@ async def run_task(goal: str, max_steps: int) -> tuple[str, list[TaskStep], dict
     steps = _extract_steps(messages)
 
     usage = result.usage
-    return result.output, steps, {
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "requests": usage.requests,
-    }
+    return (
+        result.output,
+        steps,
+        {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "requests": usage.requests,
+        },
+    )
 
 
 def _extract_steps(messages) -> list[TaskStep]:  # type: ignore[no-untyped-def]

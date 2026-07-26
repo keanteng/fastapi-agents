@@ -1,5 +1,3 @@
-"""Schemas for the tools slice."""
-
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

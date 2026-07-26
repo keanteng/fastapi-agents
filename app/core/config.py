@@ -1,5 +1,3 @@
-"""Application configuration loaded from environment."""
-
 from __future__ import annotations
 
 from pydantic import Field

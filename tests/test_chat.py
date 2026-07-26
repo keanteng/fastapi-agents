@@ -10,7 +10,9 @@ def test_chat(client: TestClient) -> None:
 
 
 def test_chat_stream(client: TestClient) -> None:
-    with client.stream("POST", "/api/v1/chat/stream", json={"user_prompt": "hello"}) as resp:
+    with client.stream(
+        "POST", "/api/v1/chat/stream", json={"user_prompt": "hello"}
+    ) as resp:
         assert resp.status_code == 200
         events = [line for line in resp.iter_lines() if line]
     # SSE frames start with ``data:``; ensure at least one arrived.

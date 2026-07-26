@@ -1,5 +1,3 @@
-"""Extract service."""
-
 from __future__ import annotations
 
 from app.features.extract.agent import extract_agent

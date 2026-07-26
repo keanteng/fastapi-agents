@@ -1,11 +1,3 @@
-"""Jinja2 prompt rendering.
-
-Each slice keeps its templates in ``app/features/<slice>/templates``. A single
-lazily-built ``Environment`` loads them all via a file-system loader rooted at
-the ``app`` package, so slices reference templates as ``<slice>/name.jinja``
-(e.g. ``chat/system.jinja``).
-"""
-
 from __future__ import annotations
 
 from functools import lru_cache

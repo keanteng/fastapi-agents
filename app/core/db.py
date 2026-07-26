@@ -1,13 +1,3 @@
-"""Async SQLAlchemy database access.
-
-Engine + session lifecycle is owned by the FastAPI lifespan (``app.main``).
-Slices import ``Base`` to declare ORM models, ``get_session`` as a route
-dependency, and ``MessageRepository``-style classes to talk to the DB.
-
-SQLite URLs (used by tests) bypass pool_size/max_overflow since those are
-Postgres-only kwargs.
-"""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator

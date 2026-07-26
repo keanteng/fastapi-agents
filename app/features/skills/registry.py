@@ -1,12 +1,3 @@
-"""Skill registry.
-
-A ``Skill`` bundles a name, description and the factory that builds a
-per-request ``Agent``. The orchestrator agent is given a single tool
-(``dispatch_skill``) whose body looks the skill up by name, builds the agent
-fresh, runs it on the supplied input and returns the text. This demonstrates
-dynamic, model-selected composition: the LLM chooses which sub-agent runs.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

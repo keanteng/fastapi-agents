@@ -1,5 +1,3 @@
-"""Skills service."""
-
 from __future__ import annotations
 
 from app.features.skills.agent import skills_agent

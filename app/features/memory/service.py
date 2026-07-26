@@ -1,11 +1,3 @@
-"""Memory service: bridge the repository to the memory-aware agent.
-
-Stateless functions take the caller's ``AsyncSession`` so transactions are
-owned by the route (and committed here once mutations are complete). The
-agent still uses pydantic-ai's ``message_history`` for replay; the
-repository only (de)serialises raw ``ModelMessage`` rows.
-"""
-
 from __future__ import annotations
 
 import uuid
@@ -24,7 +16,9 @@ _SYSTEM_TEMPLATE = "features/memory/templates/system.jinja"
 
 def _user_message(user_prompt: str) -> ModelRequest:
     return ModelRequest(
-        parts=[UserPromptPart(content=user_prompt, timestamp=datetime.now(timezone.utc))]
+        parts=[
+            UserPromptPart(content=user_prompt, timestamp=datetime.now(timezone.utc))
+        ]
     )
 
 
@@ -91,8 +85,12 @@ async def chat_with_memory(
     usage = result.usage
     await repo.set(conversation_id, result.all_messages())
     await session.commit()
-    return result.output, result.all_messages(), {
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "requests": usage.requests,
-    }
+    return (
+        result.output,
+        result.all_messages(),
+        {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "requests": usage.requests,
+        },
+    )

@@ -1,10 +1,3 @@
-"""Repository for the memory slice.
-
-Wraps the conversations/messages tables and (de)serialises pydantic-ai
-``ModelMessage`` objects via ``ModelMessagesTypeAdapter`` so callers don't
-care about row shape.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence

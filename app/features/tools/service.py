@@ -1,5 +1,3 @@
-"""Tools service."""
-
 from __future__ import annotations
 
 from app.features.tools.agent import tools_agent

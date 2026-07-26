@@ -1,15 +1,10 @@
-"""Function tools exposed to the tools agent.
-
-Demonstrates ``@agent.tool`` (instance method receiving ``RunContext``) and
-``@agent.tool_plain`` (no deps) forms.
-"""
-
 from __future__ import annotations
 
 import ast
 import operator
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Any
 
 import httpx
 from pydantic_ai import RunContext
@@ -18,7 +13,7 @@ from pydantic_ai import RunContext
 # Safe arithmetic evaluator
 # --------------------------------------------------------------------------- #
 
-_BINOPS = {
+_BINOPS: dict[type, Callable[[Any, Any], Any]] = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
@@ -27,7 +22,7 @@ _BINOPS = {
     ast.Mod: operator.mod,
     ast.Pow: operator.pow,
 }
-_UNARYOPS = {
+_UNARYOPS: dict[type, Callable[[Any], Any]] = {
     ast.UAdd: operator.pos,
     ast.USub: operator.neg,
 }
@@ -66,17 +61,19 @@ async def http_fetch(url: str, *, timeout: float = 10.0) -> str:
 # import cycle (the agent module imports this module).
 
 
-
 def register_tools(agent) -> None:  # type: ignore[no-untyped-def]
     """Attach function tools to ``agent``."""
 
     @agent.tool_plain
-    def calculator(expression: Annotated[str, "A numeric expression, e.g. '(1+2)*3'"]) -> str:
+    def calculator(
+        expression: Annotated[str, "A numeric expression, e.g. '(1+2)*3'"],
+    ) -> str:
         """Evaluate a numeric expression and return the result."""
         try:
             value = safe_eval(expression)
         except Exception as exc:  # noqa: BLE001 - surface to the model via retry message
             from pydantic_ai import ModelRetry
+
             raise ModelRetry(f"could not evaluate {expression!r}: {exc}") from exc
         return str(value)
 
@@ -90,6 +87,7 @@ def register_tools(agent) -> None:  # type: ignore[no-untyped-def]
             return await http_fetch(url)
         except Exception as exc:  # noqa: BLE001
             from pydantic_ai import ModelRetry
+
             raise ModelRetry(f"fetch failed for {url}: {exc}") from exc
 
     @agent.tool_plain

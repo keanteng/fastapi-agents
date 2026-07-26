@@ -1,10 +1,3 @@
-"""Sub-agents wrapped as orchestrator tools.
-
-Each tool runs another slice's agent on a sub-task, returning its text output.
-The orchestrator therefore performs multi-step work by **delegating** to
-specialised sub-agents, one tool call per step.
-"""
-
 from __future__ import annotations
 
 from typing import Annotated
@@ -55,7 +48,8 @@ def register_task_tools(agent) -> None:  # type: ignore[no-untyped-def]
     @agent.tool_plain
     async def delegate_tools(
         subtask: Annotated[
-            str, "The sub-task requiring tools (math, time, url fetch) for the tools sub-agent"
+            str,
+            "The sub-task requiring tools (math, time, url fetch) for the tools sub-agent",
         ],
     ) -> str:
         """Delegate a tool-needing sub-task to the tools sub-agent."""

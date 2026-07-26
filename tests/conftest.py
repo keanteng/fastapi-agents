@@ -13,7 +13,7 @@ never touched.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Literal
 
 from collections.abc import AsyncIterator, Iterator
 
@@ -25,14 +25,8 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import app.core.db as db_module
-import app.features.chat.agent as chat_module
-import app.features.extract.agent as extract_module
-import app.features.memory.agent as memory_module
 import app.features.memory.models  # noqa: F401 -- registers ORM on Base.metadata
-import app.features.skills.agent as skills_module
 import app.features.skills.skills.skills as skill_factory_module
-import app.features.tasks.orchestrator as tasks_module
-import app.features.tools.agent as tools_module
 import app.features.tools.tools as tools_tools_module
 from app.core.db import Base, get_session
 from app.features.chat.agent import chat_agent
@@ -42,7 +36,7 @@ from app.features.memory.models import Conversation, Message
 from app.features.skills.agent import skills_agent
 from app.features.tasks.orchestrator import tasks_agent
 from app.features.tools.agent import tools_agent
-from app.main import app
+from app.main import app as fastapi_app
 
 # ----- Shared in-memory SQLite engine for the test session -----------------
 _test_engine = create_async_engine(
@@ -81,7 +75,7 @@ async def _override_get_session() -> AsyncIterator:
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    with TestClient(app) as c:
+    with TestClient(fastapi_app) as c:
         yield c
 
 
@@ -91,13 +85,11 @@ class ScriptedTestModel(TestModel):
     def __init__(
         self,
         *,
-        call_tools: "list[str] | str",
+        call_tools: list[str] | Literal["all"],
         tool_args: dict[str, Any] | None = None,
         custom_output_text: str | None = None,
     ) -> None:
-        super().__init__(
-            call_tools=call_tools, custom_output_text=custom_output_text
-        )
+        super().__init__(call_tools=call_tools, custom_output_text=custom_output_text)
         self._tool_args = tool_args or {}
 
     def gen_tool_args(self, tool_def):  # type: ignore[no-untyped-def]
@@ -107,10 +99,12 @@ class ScriptedTestModel(TestModel):
 
 
 @pytest.fixture(autouse=True)
-def patch_models(monkeypatch) -> None:
+def patch_models(monkeypatch) -> Iterator[None]:
     # Default model for dynamically-built skill agents.
     monkeypatch.setattr(
-        skill_factory_module, "get_model", lambda: TestModel(custom_output_text="skill-output")
+        skill_factory_module,
+        "get_model",
+        lambda: TestModel(custom_output_text="skill-output"),
     )
 
     chat_agent._model = TestModel(custom_output_text="chat-response")
@@ -155,9 +149,9 @@ def patch_models(monkeypatch) -> None:
         return None
 
     monkeypatch.setattr(main_module, "dispose_db", _noop_dispose)
-    app.dependency_overrides[get_session] = _override_get_session
+    fastapi_app.dependency_overrides[get_session] = _override_get_session
 
-    yield  # type: ignore[misc]
+    yield
 
-    app.dependency_overrides.pop(get_session, None)
+    fastapi_app.dependency_overrides.pop(get_session, None)
     _truncate()

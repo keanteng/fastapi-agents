@@ -1,9 +1,3 @@
-"""Schemas for the extract slice.
-
-``ExtractionResult`` doubles as the agent's structured ``output_type``: the
-model is forced to fill it, and pydantic-ai validates + retries on failure.
-"""
-
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

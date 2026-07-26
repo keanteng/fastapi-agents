@@ -1,5 +1,3 @@
-"""Memory agent (memory-aware chat variant)."""
-
 from __future__ import annotations
 
 from pydantic_ai import Agent

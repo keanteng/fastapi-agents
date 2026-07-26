@@ -1,11 +1,3 @@
-"""Stable DTO mapping for pydantic-ai ``ModelMessage`` lists.
-
-The frontend-facing schema (``MessageOut``/``PartOut``) intentionally hides
-pydantic-ai's internal part taxonomy so external clients aren't coupled to
-the agent framework. The repository stores the raw payload (see
-``repository.py``) so we always round-trip back to full-fidelity messages.
-"""
-
 from __future__ import annotations
 
 from datetime import datetime

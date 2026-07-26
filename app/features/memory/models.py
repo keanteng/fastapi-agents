@@ -1,11 +1,3 @@
-"""ORM models for the memory slice.
-
-Only one slice persists today; new slices that need persistence should add
-their own ``models.py`` importing ``Base`` from ``app.core.db`` and ensure
-their module is imported by ``app/core/migrations/env.py`` (or another
-``Base.metadata`` collector) so alembic sees it.
-"""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime

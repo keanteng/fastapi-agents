@@ -1,10 +1,8 @@
-"""Skills orchestrator agent."""
-
 from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic_ai import Agent, ModelRetry, RunContext
+from pydantic_ai import Agent, ModelRetry
 
 from app.core.model import get_model
 from app.core.prompts import render

@@ -1,9 +1,3 @@
-"""Chat agent.
-
-Stateless chat agent backed by DeepSeek. The system prompt is rendered from a
-Jinja template so prompt-engineering lives in files, not source.
-"""
-
 from __future__ import annotations
 
 from pydantic_ai import Agent

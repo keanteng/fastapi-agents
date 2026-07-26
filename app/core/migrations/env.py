@@ -39,7 +39,9 @@ def _sync_url(url: str) -> str:
     """Replace the async driver with psycopg2 for alembic's sync runner."""
     parsed = make_url(url)
     if parsed.drivername == "postgresql+asyncpg":
-        return parsed.set(drivername="postgresql+psycopg2").render_as_string(hide_password=False)
+        return parsed.set(drivername="postgresql+psycopg2").render_as_string(
+            hide_password=False
+        )
     return url
 
 

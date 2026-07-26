@@ -17,7 +17,9 @@ def test_memory_lifecycle(client: TestClient) -> None:
     assert appended["messages_after"] == 1
 
     # memory-aware chat replays history and stores the turn
-    r = client.post(f"/api/v1/memory/{cid}/chat", json={"user_prompt": "what did I say?"})
+    r = client.post(
+        f"/api/v1/memory/{cid}/chat", json={"user_prompt": "what did I say?"}
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["conversation_id"] == cid

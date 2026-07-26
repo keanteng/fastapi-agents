@@ -1,5 +1,3 @@
-"""Chat service: run the agent and stream responses."""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -14,11 +12,15 @@ async def run_chat(user_prompt: str) -> tuple[str, list[ModelMessage], dict[str,
     async with chat_agent:
         result = await chat_agent.run(user_prompt)
     usage = result.usage
-    return result.output, result.new_messages(), {
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "requests": usage.requests,
-    }
+    return (
+        result.output,
+        result.new_messages(),
+        {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "requests": usage.requests,
+        },
+    )
 
 
 async def stream_chat(user_prompt: str) -> AsyncIterator[str]:

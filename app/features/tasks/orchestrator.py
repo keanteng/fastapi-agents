@@ -1,5 +1,3 @@
-"""Multi-step task orchestrator agent."""
-
 from __future__ import annotations
 
 from pydantic_ai import Agent, UsageLimits
