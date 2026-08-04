@@ -15,7 +15,7 @@ from app.core.prompts import render
 def summarizer_skill() -> Agent[None, str]:
     agent: Agent[None, str] = Agent(
         get_model(),
-        instructions=lambda _: render("features/skills/templates/summarizer.jinja"),
+        instructions=lambda _: render("skill_summarizer"),
         output_type=str,
     )
     return agent
@@ -24,7 +24,7 @@ def summarizer_skill() -> Agent[None, str]:
 def translator_skill() -> Agent[None, str]:
     agent: Agent[None, str] = Agent(
         get_model(),
-        instructions=lambda _: render("features/skills/templates/translator.jinja"),
+        instructions=lambda _: render("skill_translator"),
         output_type=str,
     )
     return agent
@@ -33,7 +33,7 @@ def translator_skill() -> Agent[None, str]:
 def code_reviewer_skill() -> Agent[None, str]:
     agent: Agent[None, str] = Agent(
         get_model(),
-        instructions=lambda _: render("features/skills/templates/code_reviewer.jinja"),
+        instructions=lambda _: render("skill_code_reviewer"),
         output_type=str,
     )
     return agent

@@ -8,7 +8,7 @@ from app.features.tasks.executor import register_task_tools
 
 tasks_agent: Agent[None, str] = Agent(
     get_model(),
-    instructions=lambda _: render("features/tasks/templates/orchestrator.jinja"),
+    instructions=lambda _: render("tasks_orchestrator"),
     output_type=str,
 )
 register_task_tools(tasks_agent)

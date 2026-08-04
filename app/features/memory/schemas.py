@@ -52,10 +52,10 @@ class MemoryAppendResponse(BaseModel):
 
 class MemoryChatRequest(BaseModel):
     user_prompt: str = Field(..., min_length=1)
-    system_prompt_template: str | None = Field(
+    system_prompt: str | None = Field(
         default=None,
-        description="Optional Jinja template path override "
-        "(defaults to features/memory/templates/system.jinja).",
+        description="Optional prompt task key override "
+        "(see app/core/prompts.yml; defaults to 'memory').",
     )
 
 

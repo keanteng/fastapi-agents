@@ -1,7 +1,8 @@
 """FastAPI application factory.
 
-Lifespan owns the shared model HTTP client lifecycle; routers are mounted per
-slice (vertical slices self-contained).
+Lifespan builds the shared ``AppContainer`` (config, LLM model, prompt engine)
+and the DB pool; middleware is registered centrally in ``core.middleware``.
+Routers are mounted per slice (vertical slices self-contained).
 """
 
 from __future__ import annotations
@@ -11,27 +12,25 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.router import api_router
 from app.core.config import settings
+from app.core.container import build_container, close_container
 from app.core.db import dispose_db, init_db
-from app.core.model import get_model
-from app.features.chat.router import router as chat_router
-from app.features.extract.router import router as extract_router
-from app.features.memory.router import router as memory_router
-from app.features.skills.router import router as skills_router
-from app.features.tasks.router import router as tasks_router
-from app.features.tools.router import router as tools_router
+from app.core.middleware import register_middleware
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # Touch the model so its HTTP client is created up-front; the agent's
-    # async-context-manager use in services closes clients after each run.
-    get_model()
+    # Build shared singletons (touching the model creates its HTTP client
+    # up-front; agents close their own clients after each run).
+    container = build_container()
+    _app.state.container = container
     init_db()
     try:
         yield
     finally:
         await dispose_db()
+        close_container()
 
 
 def create_app() -> FastAPI:
@@ -41,15 +40,8 @@ def create_app() -> FastAPI:
         description="Vertical-slice FastAPI server showcasing pydantic-ai with DeepSeek.",
         lifespan=lifespan,
     )
-    for router in (
-        chat_router,
-        memory_router,
-        tools_router,
-        skills_router,
-        tasks_router,
-        extract_router,
-    ):
-        app.include_router(router)
+    register_middleware(app)
+    app.include_router(api_router)
     return app
 
 

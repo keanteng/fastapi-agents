@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from pydantic import Field
+import logging
+import re
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -16,6 +21,17 @@ class Settings(BaseSettings):
 
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
+
+    # Allowed CORS origins, e.g. ["http://localhost:5173"]. "*" allows any.
+    cors_origins: list[str] = Field(default_factory=lambda: ["*"], alias="CORS_ORIGINS")
+
+    @field_validator("deepseek_api_key", mode="before")
+    @classmethod
+    def _clean_api_key(cls, value: str) -> str:
+        key = re.sub(r"^your-", "", value.strip()).strip("'\"")
+        if key != value:
+            logger.warning("DEEPSEEK_API_KEY normalized (stripped quotes/prefix)")
+        return key
 
     # Database. Default to a local Postgres; tests swap to an in-memory
     # SQLite URL via the session fixtures (see tests/conftest.py).

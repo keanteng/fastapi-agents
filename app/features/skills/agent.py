@@ -11,7 +11,7 @@ from app.features.skills.registry import Skill, available_skills, get_skill
 skills_agent: Agent[None, str] = Agent(
     get_model(),
     instructions=lambda _: render(
-        "features/skills/templates/orchestrator.jinja",
+        "skills_orchestrator",
         skills={name: (desc, None) for name, desc in available_skills().items()},
     ),
     output_type=str,

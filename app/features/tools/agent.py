@@ -8,7 +8,7 @@ from app.features.tools.tools import register_tools
 
 tools_agent: Agent[None, str] = Agent(
     get_model(),
-    instructions=lambda _: render("features/tools/templates/system.jinja"),
+    instructions=lambda _: render("tools"),
     output_type=str,
 )
 register_tools(tools_agent)

@@ -11,7 +11,7 @@ from app.core.prompts import render
 from app.features.memory.agent import memory_agent
 from app.features.memory.repository import MemoryRepository
 
-_SYSTEM_TEMPLATE = "features/memory/templates/system.jinja"
+_SYSTEM_TASK = "memory"
 
 
 def _user_message(user_prompt: str) -> ModelRequest:
@@ -64,7 +64,7 @@ async def chat_with_memory(
     conversation_id: str,
     user_prompt: str,
     session: AsyncSession,
-    system_prompt_template: str | None = None,
+    system_prompt_task: str | None = None,
 ) -> tuple[str, list[ModelMessage], dict[str, int]]:
     """Run the memory agent, replaying stored history and persisting new turns."""
     repo = _repo(session)
@@ -73,8 +73,8 @@ async def chat_with_memory(
 
     history = await repo.get(conversation_id)
 
-    template = system_prompt_template or _SYSTEM_TEMPLATE
-    instructions = render(template, conversation_id=conversation_id)
+    task = system_prompt_task or _SYSTEM_TASK
+    instructions = render(task, conversation_id=conversation_id)
 
     async with memory_agent:
         result = await memory_agent.run(

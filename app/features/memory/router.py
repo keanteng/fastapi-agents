@@ -72,7 +72,7 @@ async def memory_chat(
     session: AsyncSession = Depends(get_session),
 ) -> MemoryChatResponse:
     output, _messages, usage = await chat_with_memory(
-        conversation_id, body.user_prompt, session, body.system_prompt_template
+        conversation_id, body.user_prompt, session, body.system_prompt
     )
     return MemoryChatResponse(
         conversation_id=conversation_id, output=output, usage=usage

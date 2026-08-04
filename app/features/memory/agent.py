@@ -8,7 +8,7 @@ from app.core.prompts import render
 memory_agent: Agent[None, str] = Agent(
     get_model(),
     instructions=lambda ctx: render(
-        "features/memory/templates/system.jinja",
+        "memory",
         conversation_id=ctx.conversation_id or "",
     ),
     output_type=str,

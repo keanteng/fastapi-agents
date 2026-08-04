@@ -12,7 +12,7 @@ extract_agent: Agent[None, ExtractionResult] = cast(
     Agent[None, ExtractionResult],
     Agent(
         get_model(),
-        instructions=lambda _: render("features/extract/templates/system.jinja"),
+        instructions=lambda _: render("extract"),
         output_type=ExtractionResult,
     ),
 )

@@ -7,7 +7,6 @@ from app.core.prompts import render
 
 chat_agent: Agent[None, str] = Agent(
     get_model(),
-    instructions=lambda _: render("features/chat/templates/system.jinja"),
+    instructions=lambda _: render("chat"),
     output_type=str,
 )
-"""Shared chat agent used by both the chat and memory slices."""
