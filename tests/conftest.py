@@ -74,7 +74,9 @@ async def _override_get_session() -> AsyncIterator:
         yield session
 
 
-def wait_for_status(client: TestClient, run_id: str, expected: str, timeout: float = 3.0) -> dict:
+def wait_for_status(
+    client: TestClient, run_id: str, expected: str, timeout: float = 3.0
+) -> dict:
     """Poll ``GET /api/v1/runs/{run_id}`` until ``status == expected``."""
     import time
 

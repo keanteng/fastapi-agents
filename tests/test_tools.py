@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 import pytest
 from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.toolsets import FunctionToolset
 
 import app.agents.tools as tools_module
 from app.agents.tools import (
@@ -53,6 +56,7 @@ async def test_tool_adapter_converts_errors_to_model_retry() -> None:
         tools=[tool_adapter(_boom, "boom")],
         output_type=str,
     )
-    tool = agent.toolsets[0].tools["boom"]
+    tool = cast(FunctionToolset, agent.toolsets[0]).tools["boom"]
+    function = cast(Callable[..., Awaitable[Any]], tool.function)
     with pytest.raises(ModelRetry):
-        await tool.function(x="hi")
+        await function(x="hi")
