@@ -321,6 +321,13 @@ git commit -m "feat: add agents/runs/api package skeleton and error envelope"
 
 ## Task 2: Shared tools + skills + dual-mode conftest
 
+> Status: COMPLETE (commits `a0818f2`, `7166f3a`, `86b611d`; reviewer APPROVED)
+> Approved deviations from the verbatim code below: (1) `tests/test_tools.py` calls
+> `tools_module.http_fetch(...)` via module attribute instead of the bare import, because the
+> conftest patches the module attribute at runtime; (2) `tests/conftest.py`'s new-layer fetch
+> stub is an `async def` (the new `http_fetch` is a coroutine function). Both were required to
+> make the network-stub effective; `app/agents/tools.py` and `app/agents/skills.py` are byte-for-byte as written.
+
 **Files:**
 - Create: `app/agents/tools.py`
 - Create: `app/agents/skills.py`
@@ -328,7 +335,7 @@ git commit -m "feat: add agents/runs/api package skeleton and error envelope"
 - Rewrite: `tests/test_tools.py`
 - Rewrite: `tests/test_skills.py`
 
-- [ ] **Step 1: Write the failing tool tests**
+- [x] **Step 1: Write the failing tool tests**
 
 Rewrite `tests/test_tools.py`:
 
@@ -393,12 +400,12 @@ async def test_tool_adapter_converts_errors_to_model_retry() -> None:
         await tool.function(x="hi")
 ```
 
-- [ ] **Step 2: Run the tool tests to verify they fail**
+- [x] **Step 2: Run the tool tests to verify they fail**
 
 Run: `uv run pytest tests/test_tools.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.agents.tools'`.
 
-- [ ] **Step 3: Write the failing skill tests**
+- [x] **Step 3: Write the failing skill tests**
 
 Rewrite `tests/test_skills.py`:
 
@@ -440,12 +447,12 @@ async def test_dispatch_skill_unknown_raises() -> None:
         await dispatch_skill("does-not-exist", "text")
 ```
 
-- [ ] **Step 4: Run the skill tests to verify they fail**
+- [x] **Step 4: Run the skill tests to verify they fail**
 
 Run: `uv run pytest tests/test_skills.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.agents.skills'`.
 
-- [ ] **Step 5: Create `app/agents/tools.py`**
+- [x] **Step 5: Create `app/agents/tools.py`**
 
 Create `app/agents/tools.py`:
 
@@ -554,7 +561,7 @@ def tool_adapter(fn: Callable, name: str) -> Tool:
     return Tool(wrapped, name=name)
 ```
 
-- [ ] **Step 6: Create `app/agents/skills.py`**
+- [x] **Step 6: Create `app/agents/skills.py`**
 
 Create `app/agents/skills.py`:
 
@@ -637,7 +644,7 @@ async def dispatch_skill(skill_name: str, input_text: str) -> str:
     return result.output
 ```
 
-- [ ] **Step 7: Rewrite `tests/conftest.py` (dual-mode)**
+- [x] **Step 7: Rewrite `tests/conftest.py` (dual-mode)**
 
 Replace the entire contents of `tests/conftest.py` with:
 
@@ -844,17 +851,17 @@ def patch_models(monkeypatch) -> Iterator[None]:
     _truncate()
 ```
 
-- [ ] **Step 8: Run the tool and skill tests**
+- [x] **Step 8: Run the tool and skill tests**
 
 Run: `uv run pytest tests/test_tools.py tests/test_skills.py -v`
 Expected: both files pass (11 tests total).
 
-- [ ] **Step 9: Run the whole suite to confirm the legacy tests still pass**
+- [x] **Step 9: Run the whole suite to confirm the legacy tests still pass**
 
 Run: `uv run pytest -q`
 Expected: `23 passed` (12 legacy + 3 envelope + 11 new minus the 3 replaced legacy endpoint tests).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add app/agents/tools.py app/agents/skills.py tests/conftest.py tests/test_tools.py tests/test_skills.py
