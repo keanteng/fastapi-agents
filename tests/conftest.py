@@ -1,33 +1,34 @@
 """Test fixtures.
 
-Every slice agent is swapped onto pydantic-ai's ``TestModel`` so the test suite
-never talks to the DeepSeek API. ``ScriptedTestModel`` lets us feed specific
-arguments to the tools exercised by each orchestrator.
-
 The DB is backed by an in-memory SQLite engine shared across tests; tables
-are truncated between tests for isolation. The lifespan's real
-``init_db`` / ``dispose_db`` are stubbed so the production DATABASE_URL is
-never touched.
+are truncated between tests for isolation. The lifespan's real ``init_db`` /
+``dispose_db`` are stubbed so the production DATABASE_URL is never touched.
+
+Models: every agent built by ``app.agents.build`` (including dynamically built
+skill and delegation sub-agents) uses pydantic-ai ``TestModel``. Tests that
+need specific tool calls or output text set the model per-test with the
+``agent_model`` fixture.
 """
 
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Literal
-
 from collections.abc import AsyncIterator, Iterator
+from typing import Any, Literal
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic_ai.models.test import TestModel
 from sqlalchemy import delete
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
+import app.agents.skills as skills_module
+import app.agents.tools as tools_module
 import app.core.db as db_module
 import app.features.memory.models  # noqa: F401 -- registers ORM on Base.metadata
-import app.features.skills.skills.skills as skill_factory_module
-import app.features.tools.tools as tools_tools_module
+import app.features.skills.skills.skills as skill_factory_module  # legacy slice
+import app.features.tools.tools as tools_tools_module  # legacy slice
 from app.core.db import Base, get_session
 from app.features.chat.agent import chat_agent
 from app.features.extract.agent import extract_agent
@@ -73,6 +74,21 @@ async def _override_get_session() -> AsyncIterator:
         yield session
 
 
+def wait_for_status(client: TestClient, run_id: str, expected: str, timeout: float = 3.0) -> dict:
+    """Poll ``GET /api/v1/runs/{run_id}`` until ``status == expected``."""
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/v1/runs/{run_id}")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        if body["status"] == expected:
+            return body
+        time.sleep(0.02)
+    raise AssertionError(f"run {run_id} never reached status {expected!r}")
+
+
 @pytest.fixture
 def client() -> Iterator[TestClient]:
     with TestClient(fastapi_app) as c:
@@ -98,9 +114,35 @@ class ScriptedTestModel(TestModel):
         return super().gen_tool_args(tool_def)
 
 
+class _ModelHolder:
+    current: Any = None
+
+
+_model_holder = _ModelHolder()
+
+
+@pytest.fixture
+def agent_model() -> Iterator[Any]:
+    """Set the model ``build_agent`` uses for the duration of a test."""
+
+    def set_model(model: Any) -> None:
+        _model_holder.current = model
+
+    yield set_model
+    _model_holder.current = None
+
+
 @pytest.fixture(autouse=True)
 def patch_models(monkeypatch) -> Iterator[None]:
-    # Default model for dynamically-built skill agents.
+    # New layer: skill factories get TestModel. ``app.agents.build`` gets its
+    # TestModel patch added in Task 3 (when that module is created).
+    monkeypatch.setattr(
+        skills_module,
+        "get_model",
+        lambda: TestModel(custom_output_text="skill-output"),
+    )
+
+    # Legacy slice: keep the old slice agents on TestModel until they are deleted.
     monkeypatch.setattr(
         skill_factory_module,
         "get_model",
@@ -134,8 +176,13 @@ def patch_models(monkeypatch) -> Iterator[None]:
         custom_output_text="tasks-done",
     )
 
-    # Safety net so the fetch tool never touches the network.
+    # Safety net so no fetch tool ever touches the network.
     monkeypatch.setattr(tools_tools_module, "http_fetch", lambda *a, **k: "stub-body")
+
+    async def _stub_http_fetch(*args: Any, **kwargs: Any) -> str:
+        return "stub-body"
+
+    monkeypatch.setattr(tools_module, "http_fetch", _stub_http_fetch)
 
     # Point the DB layer at the test engine and stub the lifespan hooks so the
     # production DATABASE_URL is never opened.
