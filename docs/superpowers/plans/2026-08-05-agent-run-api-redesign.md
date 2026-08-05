@@ -82,6 +82,8 @@ git commit -m "chore: bump pydantic-ai floor to >=2.9.0 and add mcp>=1.28"
 
 ## Task 1: New package skeleton + error envelope
 
+> Status: COMPLETE (commit `4af5ec9`; reviewer APPROVED)
+
 **Files:**
 - Create: `app/agents/__init__.py`
 - Create: `app/runs/__init__.py`
@@ -90,7 +92,7 @@ git commit -m "chore: bump pydantic-ai floor to >=2.9.0 and add mcp>=1.28"
 - Create: `app/api/errors.py`
 - Test: `tests/test_error_envelope.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_error_envelope.py`:
 
@@ -167,12 +169,12 @@ def test_internal_error_envelope() -> None:
     }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `uv run pytest tests/test_error_envelope.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.api.errors'` (import at the top of the test file).
 
-- [ ] **Step 3: Write the skeleton package files**
+- [x] **Step 3: Write the skeleton package files**
 
 Create `app/agents/__init__.py`:
 
@@ -192,7 +194,7 @@ Create `app/api/__init__.py`:
 """Public HTTP layer."""
 ```
 
-- [ ] **Step 4: Create `app/runs/models.py` with `ErrorBody`**
+- [x] **Step 4: Create `app/runs/models.py` with `ErrorBody`**
 
 Create `app/runs/models.py`:
 
@@ -213,7 +215,7 @@ class ErrorBody(BaseModel):
 
 (Note: this file is fully rewritten in Task 5 with the rest of the run models; `ErrorBody` stays identical.)
 
-- [ ] **Step 5: Create `app/api/errors.py`**
+- [x] **Step 5: Create `app/api/errors.py`**
 
 Create `app/api/errors.py`:
 
@@ -298,17 +300,17 @@ def register_error_handlers(app: FastAPI) -> None:
         )
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 Run: `uv run pytest tests/test_error_envelope.py -v`
 Expected: `3 passed`.
 
-- [ ] **Step 7: Run the whole suite to confirm nothing regressed**
+- [x] **Step 7: Run the whole suite to confirm nothing regressed**
 
 Run: `uv run pytest -q`
 Expected: `15 passed` (12 baseline + 3 new).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/agents/__init__.py app/runs/__init__.py app/api/__init__.py app/runs/models.py app/api/errors.py tests/test_error_envelope.py
