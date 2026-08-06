@@ -3226,11 +3226,13 @@ git commit -m "feat: add run runner with lifecycle, events, timeout, and cancel 
 
 ## Task 7: SSE event stream layer
 
+> Status: COMPLETE (committed; `test_stream_waits_for_late_events` expectation corrected to include the replayed `response.created`, per the spec's replay guarantee)
+
 **Files:**
 - Create: `app/runs/sse.py`
 - Test: `tests/test_sse.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_sse.py`:
 
@@ -3336,12 +3338,12 @@ async def test_stream_does_not_ping_after_terminal() -> None:
     assert frames[-1]["event"] == "response.completed"
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_sse.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.runs.sse'`.
 
-- [ ] **Step 3: Create `app/runs/sse.py`**
+- [x] **Step 3: Create `app/runs/sse.py`**
 
 Create `app/runs/sse.py`:
 
@@ -3387,17 +3389,17 @@ async def stream_events(
         registry.release_subscriber(record)
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `uv run pytest tests/test_sse.py -v`
 Expected: `5 passed`.
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `60 passed` (55 + 5 new).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/runs/sse.py tests/test_sse.py
