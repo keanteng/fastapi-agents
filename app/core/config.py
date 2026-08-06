@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Allowed CORS origins, e.g. ["http://localhost:5173"]. "*" allows any.
     cors_origins: list[str] = Field(default_factory=lambda: ["*"], alias="CORS_ORIGINS")
 
+    # Runs: wall-clock budget for a single run (seconds).
+    run_timeout_seconds: int = Field(default=300, alias="RUN_TIMEOUT_SECONDS")
+
     @field_validator("deepseek_api_key", mode="before")
     @classmethod
     def _clean_api_key(cls, value: str) -> str:

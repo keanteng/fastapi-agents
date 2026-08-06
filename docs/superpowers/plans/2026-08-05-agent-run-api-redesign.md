@@ -2548,6 +2548,8 @@ git commit -m "feat: add run models and in-memory run registry"
 
 ## Task 6: Run runner + events + timeout config
 
+> Status: COMPLETE (committed; events.py already created in Task 5; `test_runner_completes_string_run` sets `agent_model(TestModel(call_tools=[], ...))` since a plain TestModel calls all tools with junk args; memory helpers guard the None conversation_id)
+
 **Files:**
 - Modify: `app/core/config.py` (add `RUN_TIMEOUT_SECONDS`)
 - Modify: `.env.example` (add `RUN_TIMEOUT_SECONDS`)
@@ -2555,7 +2557,7 @@ git commit -m "feat: add run models and in-memory run registry"
 - Create: `app/runs/runner.py`
 - Test: `tests/test_runs_runner.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_runs_runner.py`:
 
@@ -2807,12 +2809,12 @@ async def test_runner_cancel_mid_run(monkeypatch, agent_model) -> None:
     assert record.events[-1].type == "run.cancelled"
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_runs_runner.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.runs.runner'`.
 
-- [ ] **Step 3: Add the timeout setting**
+- [x] **Step 3: Add the timeout setting**
 
 In `app/core/config.py`, after the CORS block and before the `@field_validator` decorator, add:
 
@@ -2827,7 +2829,7 @@ In `.env.example`, after the `CORS_ORIGINS` line, add:
 RUN_TIMEOUT_SECONDS=300
 ```
 
-- [ ] **Step 4: Create `app/runs/events.py`**
+- [x] **Step 4: Create `app/runs/events.py`**
 
 Create `app/runs/events.py`:
 
@@ -2898,7 +2900,7 @@ def ping_data() -> dict[str, Any]:
     return {"t": datetime.now(timezone.utc).isoformat()}
 ```
 
-- [ ] **Step 5: Create `app/runs/runner.py`**
+- [x] **Step 5: Create `app/runs/runner.py`**
 
 Create `app/runs/runner.py`:
 
@@ -3203,17 +3205,17 @@ async def _persist_history(conversation_id: str | None, messages: list[Any]) -> 
         await session.close()
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `uv run pytest tests/test_runs_runner.py -v`
 Expected: `8 passed`.
 
-- [ ] **Step 7: Run the whole suite**
+- [x] **Step 7: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `55 passed` (47 + 8 new).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/core/config.py .env.example app/runs/events.py app/runs/runner.py tests/test_runs_runner.py
