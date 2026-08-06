@@ -3410,6 +3410,8 @@ git commit -m "feat: add SSE event stream layer"
 
 ## Task 8: HTTP routers (runs + agents) and app wiring
 
+> Status: COMPLETE (committed; deviations: test SQLite moved from `:memory:` to a temp file because run-task cancellation invalidates the aiosqlite connection and would destroy the in-memory DB; conftest default `TestModel` uses `call_tools=[]` and memory-run tests set `call_tools=[]` because a plain TestModel calls all generalist tools with junk args and fails the run)
+
 **Files:**
 - Create: `app/api/runs.py`
 - Create: `app/api/agents.py`
@@ -3423,7 +3425,7 @@ git commit -m "feat: add SSE event stream layer"
 - Create: `tests/test_memory_runs.py`
 - Modify: `tests/test_error_envelope.py` (add integration tests against the real app)
 
-- [ ] **Step 1: Write the failing endpoint tests**
+- [x] **Step 1: Write the failing endpoint tests**
 
 Create `tests/test_runs.py`:
 
@@ -3501,7 +3503,7 @@ def test_get_run_404(client) -> None:
     assert r.json()["error"]["code"] == "run_not_found"
 ```
 
-- [ ] **Step 2: Write the cancel tests**
+- [x] **Step 2: Write the cancel tests**
 
 Create `tests/test_runs_cancel.py`:
 
@@ -3575,7 +3577,7 @@ def test_cancel_unknown_run_404(client) -> None:
     assert c.json()["error"]["code"] == "run_not_found"
 ```
 
-- [ ] **Step 3: Write the SSE endpoint tests**
+- [x] **Step 3: Write the SSE endpoint tests**
 
 Create `tests/test_runs_events.py`:
 
@@ -3672,7 +3674,7 @@ def test_second_subscriber_rejected(client) -> None:
     assert r2.json()["error"]["code"] == "sse_busy"
 ```
 
-- [ ] **Step 4: Write the agent-discovery tests**
+- [x] **Step 4: Write the agent-discovery tests**
 
 Create `tests/test_agents.py`:
 
@@ -3717,7 +3719,7 @@ def test_get_agent_404(client) -> None:
     assert r.json()["error"]["code"] == "agent_not_found"
 ```
 
-- [ ] **Step 5: Write the extractor test**
+- [x] **Step 5: Write the extractor test**
 
 Create `tests/test_extractor.py`:
 
@@ -3743,7 +3745,7 @@ def test_extractor_structured_artifact(client) -> None:
     assert set(data) >= {"entities", "language", "summary"}
 ```
 
-- [ ] **Step 6: Write the memory-runs tests**
+- [x] **Step 6: Write the memory-runs tests**
 
 Create `tests/test_memory_runs.py`:
 
@@ -3840,7 +3842,7 @@ def test_sync_poll_is_always_available(client) -> None:
     assert body["run_id"] == run_id
 ```
 
-- [ ] **Step 7: Extend the error-envelope tests for the real app**
+- [x] **Step 7: Extend the error-envelope tests for the real app**
 
 Append to `tests/test_error_envelope.py`:
 
@@ -3869,12 +3871,12 @@ def test_real_app_validation_envelope(client) -> None:
     assert body["error"]["details"]
 ```
 
-- [ ] **Step 8: Run the new tests to verify they fail**
+- [x] **Step 8: Run the new tests to verify they fail**
 
 Run: `uv run pytest tests/test_runs.py tests/test_runs_cancel.py tests/test_runs_events.py tests/test_agents.py tests/test_extractor.py tests/test_memory_runs.py tests/test_error_envelope.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.api.runs'`.
 
-- [ ] **Step 9: Create `app/api/runs.py`**
+- [x] **Step 9: Create `app/api/runs.py`**
 
 Create `app/api/runs.py`:
 
@@ -3982,7 +3984,7 @@ async def cancel_run(run_id: str, request: Request) -> RunResponse:
     return RunResponse.from_record(record)
 ```
 
-- [ ] **Step 10: Create `app/api/agents.py`**
+- [x] **Step 10: Create `app/api/agents.py`**
 
 Create `app/api/agents.py`:
 
@@ -4041,7 +4043,7 @@ async def get_agent(name: str, request: Request) -> AgentSpecOut:
     return AgentSpecOut.from_definition(definition)
 ```
 
-- [ ] **Step 11: Update `app/api/router.py`**
+- [x] **Step 11: Update `app/api/router.py`**
 
 Replace the entire contents of `app/api/router.py` with:
 
@@ -4071,7 +4073,7 @@ api_router.include_router(tasks_router)
 api_router.include_router(extract_router)
 ```
 
-- [ ] **Step 12: Update `app/main.py`**
+- [x] **Step 12: Update `app/main.py`**
 
 Replace the entire contents of `app/main.py` with:
 
@@ -4145,17 +4147,17 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 13: Run the new tests**
+- [x] **Step 13: Run the new tests**
 
 Run: `uv run pytest tests/test_runs.py tests/test_runs_cancel.py tests/test_runs_events.py tests/test_agents.py tests/test_extractor.py tests/test_memory_runs.py tests/test_error_envelope.py -q`
 Expected: `27 passed` (7 runs + 4 cancel + 4 events + 4 agents + 1 extractor + 4 memory + 3 envelope additions).
 
-- [ ] **Step 14: Run the whole suite**
+- [x] **Step 14: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `87 passed` (60 + 27 new).
 
-- [ ] **Step 15: Commit**
+- [x] **Step 15: Commit**
 
 ```bash
 git add app/api/runs.py app/api/agents.py app/api/router.py app/main.py tests/test_runs.py tests/test_runs_cancel.py tests/test_runs_events.py tests/test_agents.py tests/test_extractor.py tests/test_memory_runs.py tests/test_error_envelope.py

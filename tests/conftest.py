@@ -13,7 +13,9 @@ need specific tool calls or output text set the model per-test with the
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import Any, Literal
 
 import pytest
@@ -40,9 +42,16 @@ from app.features.tasks.orchestrator import tasks_agent
 from app.features.tools.agent import tools_agent
 from app.main import app as fastapi_app
 
-# ----- Shared in-memory SQLite engine for the test session -----------------
+# ----- Shared SQLite engine for the test session -----------------------------
+# A temp-file DB (not ``:memory:``): aiosqlite connections that are invalidated
+# when a run task is cancelled mid-flight would otherwise destroy an in-memory
+# database (the schema lives in the connection). A file keeps the schema across
+# connection churn. StaticPool still pins a single connection.
+_TEST_DB_DIR = Path(tempfile.mkdtemp(prefix="agents-test-"))
+_TEST_DB_PATH = _TEST_DB_DIR / "test.db"
+
 _test_engine = create_async_engine(
-    "sqlite+aiosqlite:///:memory:",
+    f"sqlite+aiosqlite:///{_TEST_DB_PATH}",
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
     future=True,
@@ -138,12 +147,15 @@ def agent_model() -> Iterator[Any]:
 @pytest.fixture(autouse=True)
 def patch_models(monkeypatch) -> Iterator[None]:
     # Every agent built by build_agent gets TestModel (per-test override via
-    # the ``agent_model`` fixture).
+    # the ``agent_model`` fixture). The default TestModel calls no tools so a
+    # plain generalist run completes instead of hitting tools with junk args.
     monkeypatch.setattr(
         build_module,
         "get_model",
         lambda: (
-            _model_holder.current if _model_holder.current is not None else TestModel()
+            _model_holder.current
+            if _model_holder.current is not None
+            else TestModel(call_tools=[])
         ),
     )
     monkeypatch.setattr(

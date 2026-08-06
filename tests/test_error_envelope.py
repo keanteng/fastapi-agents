@@ -68,3 +68,27 @@ def test_internal_error_envelope() -> None:
             "run_id": None,
         }
     }
+
+
+def test_real_app_404_envelope(client) -> None:
+    r = client.get("/api/v1/runs/nope")
+    body = r.json()
+    assert set(body) == {"error"}
+    assert set(body["error"]) == {"code", "message", "details", "run_id"}
+    assert body["error"]["code"] == "run_not_found"
+
+
+def test_real_app_unknown_agent_envelope(client) -> None:
+    r = client.post("/api/v1/runs", json={"agent": "ghost", "input": "hi"})
+    body = r.json()
+    assert set(body) == {"error"}
+    assert body["error"]["code"] == "unknown_agent"
+    assert body["error"]["run_id"] is None
+
+
+def test_real_app_validation_envelope(client) -> None:
+    r = client.post("/api/v1/runs", json={"agent": "generalist", "input": ""})
+    body = r.json()
+    assert set(body) == {"error"}
+    assert body["error"]["code"] == "validation_error"
+    assert body["error"]["details"]
