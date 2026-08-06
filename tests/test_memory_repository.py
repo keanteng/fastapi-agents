@@ -1,8 +1,4 @@
-"""Repository-level tests using the shared in-memory SQLite engine.
-
-These don't go through FastAPI; they exercise ``MemoryRepository`` directly to
-verify JSON round-tripping and capacity/seq behaviour.
-"""
+"""Repository + wiring tests using the shared in-memory SQLite engine."""
 
 from __future__ import annotations
 
@@ -12,7 +8,8 @@ import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.features.memory.repository import MemoryRepository
+from app.agents.memory.repository import MemoryRepository
+from app.agents.memory.wiring import load_history, persist_history
 from tests.conftest import _test_engine  # type: ignore[attr-defined]
 
 
@@ -81,3 +78,12 @@ async def test_list_ids() -> None:
         await repo.ensure("b")
         ids = await repo.list_ids()
         assert set(ids) >= {"a", "b"}
+
+
+@pytest.mark.asyncio
+async def test_wiring_persist_then_load_roundtrip() -> None:
+    await persist_history("w1", [_user("hello"), _assistant("hi there")])
+    loaded = await load_history("w1")
+    assert len(loaded) == 2
+    assert isinstance(loaded[0], ModelRequest)
+    assert isinstance(loaded[1], ModelResponse)

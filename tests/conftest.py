@@ -24,17 +24,17 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 import app.agents.build as build_module
+import app.agents.memory.models  # noqa: F401 -- registers ORM on Base.metadata
 import app.agents.skills as skills_module
 import app.agents.tools as tools_module
 import app.core.db as db_module
-import app.features.memory.models  # noqa: F401 -- registers ORM on Base.metadata
 import app.features.skills.skills.skills as skill_factory_module  # legacy slice
 import app.features.tools.tools as tools_tools_module  # legacy slice
+from app.agents.memory.models import Conversation, Message
 from app.core.db import Base, get_session
 from app.features.chat.agent import chat_agent
 from app.features.extract.agent import extract_agent
 from app.features.memory.agent import memory_agent
-from app.features.memory.models import Conversation, Message
 from app.features.skills.agent import skills_agent
 from app.features.tasks.orchestrator import tasks_agent
 from app.features.tools.agent import tools_agent

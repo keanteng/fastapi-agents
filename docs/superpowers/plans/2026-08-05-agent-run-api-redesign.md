@@ -1587,6 +1587,8 @@ git commit -m "feat: add declarative agent specs, registry, and agent builder"
 
 ## Task 4: Move the memory layer under `app/agents/memory`
 
+> Status: COMPLETE (committed; the legacy `features/memory/schemas.py` now aliases the moved `MessageOut`/`PartOut` so the legacy memory router keeps validating until Task 10)
+
 **Files:**
 - Move: `app/features/memory/models.py` → `app/agents/memory/models.py`
 - Move: `app/features/memory/repository.py` → `app/agents/memory/repository.py`
@@ -1603,7 +1605,7 @@ git commit -m "feat: add declarative agent specs, registry, and agent builder"
 
 > Note on serialize.py: the public memory DTOs (`MessageOut`/`PartOut`) die with the legacy memory CRUD, but `serialize.py` still needs them. We move `MessageOut`/`PartOut` into `app/agents/memory/schemas.py` (new home) and point the moved `serialize.py` at it; the legacy `app/features/memory/schemas.py` stays untouched for the legacy router until Task 10.
 
-- [ ] **Step 1: Move the memory ORM models**
+- [x] **Step 1: Move the memory ORM models**
 
 Run:
 
@@ -1614,7 +1616,7 @@ git mv app/features/memory/repository.py app/agents/memory/repository.py
 git mv app/features/memory/serialize.py app/agents/memory/serialize.py
 ```
 
-- [ ] **Step 2: Update the moved `repository.py` import**
+- [x] **Step 2: Update the moved `repository.py` import**
 
 In `app/agents/memory/repository.py`, change:
 
@@ -1628,7 +1630,7 @@ to:
 from app.agents.memory.models import Conversation, Message
 ```
 
-- [ ] **Step 3: Create the DTO home and update the moved `serialize.py`**
+- [x] **Step 3: Create the DTO home and update the moved `serialize.py`**
 
 Create `app/agents/memory/schemas.py`:
 
@@ -1677,7 +1679,7 @@ to:
 from app.agents.memory.schemas import MessageOut, PartOut
 ```
 
-- [ ] **Step 4: Replace the legacy files with shims**
+- [x] **Step 4: Replace the legacy files with shims**
 
 Replace `app/features/memory/models.py` with:
 
@@ -1700,7 +1702,7 @@ Replace `app/features/memory/serialize.py` with:
 from app.agents.memory.serialize import MessageOut, PartOut, to_dto  # noqa: F401
 ```
 
-- [ ] **Step 5: Create the wiring helpers**
+- [x] **Step 5: Create the wiring helpers**
 
 Create `app/agents/memory/__init__.py`:
 
@@ -1739,7 +1741,7 @@ async def persist_history(conversation_id: str, messages: Sequence[Any]) -> None
         await session.close()
 ```
 
-- [ ] **Step 6: Update the Alembic migration wiring**
+- [x] **Step 6: Update the Alembic migration wiring**
 
 In `app/core/migrations/env.py`, change:
 
@@ -1753,7 +1755,7 @@ to:
 from app.agents.memory import models as _memory_models  # noqa: F401
 ```
 
-- [ ] **Step 7: Update `tests/conftest.py` memory imports**
+- [x] **Step 7: Update `tests/conftest.py` memory imports**
 
 In `tests/conftest.py`, change:
 
@@ -1779,7 +1781,7 @@ to:
 from app.agents.memory.models import Conversation, Message
 ```
 
-- [ ] **Step 8: Update and extend the repository tests**
+- [x] **Step 8: Update and extend the repository tests**
 
 Replace the entire contents of `tests/test_memory_repository.py` with:
 
@@ -1875,17 +1877,17 @@ async def test_wiring_persist_then_load_roundtrip() -> None:
     assert isinstance(loaded[1], ModelResponse)
 ```
 
-- [ ] **Step 9: Run the memory tests**
+- [x] **Step 9: Run the memory tests**
 
 Run: `uv run pytest tests/test_memory_repository.py -v`
 Expected: `5 passed` (4 original + 1 new wiring round-trip).
 
-- [ ] **Step 10: Run the whole suite**
+- [x] **Step 10: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `33 passed` (32 + 1 new).
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add app/agents/memory/ app/features/memory/models.py app/features/memory/repository.py app/features/memory/serialize.py app/core/migrations/env.py tests/conftest.py tests/test_memory_repository.py
