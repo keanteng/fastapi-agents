@@ -4358,6 +4358,8 @@ git commit -m "feat: add FastMCP stdio server sharing the common tool callables"
 
 ## Task 10: Delete the legacy features slice
 
+> Status: COMPLETE (committed; fetch stub keeps http_fetch's real signature so the tool schema is unchanged)
+
 **Files:**
 - Delete: `app/features/` (entire directory)
 - Delete: `tests/test_chat.py`, `tests/test_tasks.py`, `tests/test_memory.py`, `tests/test_extract.py`
@@ -4365,7 +4367,7 @@ git commit -m "feat: add FastMCP stdio server sharing the common tool callables"
 - Modify: `app/api/router.py` (new routers only)
 - Modify: `app/core/prompts.yml` (drop the obsolete keys)
 
-- [ ] **Step 1: Delete the legacy source tree and its tests**
+- [x] **Step 1: Delete the legacy source tree and its tests**
 
 Run:
 
@@ -4374,7 +4376,7 @@ rm -rf app/features
 rm tests/test_chat.py tests/test_tasks.py tests/test_memory.py tests/test_extract.py
 ```
 
-- [ ] **Step 2: Update `tests/conftest.py` to the final form**
+- [x] **Step 2: Update `tests/conftest.py` to the final form**
 
 Replace the entire contents of `tests/conftest.py` with:
 
@@ -4542,7 +4544,7 @@ def patch_models(monkeypatch) -> Iterator[None]:
     _truncate()
 ```
 
-- [ ] **Step 3: Update `app/api/router.py` to the final form**
+- [x] **Step 3: Update `app/api/router.py` to the final form**
 
 Replace the entire contents of `app/api/router.py` with:
 
@@ -4559,7 +4561,7 @@ api_router.include_router(runs_router)
 api_router.include_router(agents_router)
 ```
 
-- [ ] **Step 4: Drop the obsolete prompt-catalog keys**
+- [x] **Step 4: Drop the obsolete prompt-catalog keys**
 
 Replace the entire contents of `app/core/prompts.yml` with:
 
@@ -4591,12 +4593,12 @@ skill_code_reviewer:
     version: "1.0"
 ```
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `88 passed` — every remaining test uses the new modules only.
 
-- [ ] **Step 6: Verify the legacy endpoint namespaces are really gone**
+- [x] **Step 6: Verify the legacy endpoint namespaces are really gone**
 
 Run:
 
@@ -4606,7 +4608,7 @@ uv run python -c "from app.main import app; paths = sorted({r.path for r in app.
 
 Expected output contains exactly the new endpoints and nothing under `/api/v1/chat`, `/api/v1/memory`, `/api/v1/tools`, `/api/v1/skills`, `/api/v1/tasks`, or `/api/v1/extract`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A

@@ -3,30 +3,6 @@
 # version, so business code references prompts by name instead of file paths.
 # Every path is validated at startup by ``PromptEngine``.
 
-chat:
-  default:
-    path: "features/chat/templates/system.jinja"
-    version: "1.0"
-memory:
-  default:
-    path: "features/memory/templates/system.jinja"
-    version: "1.0"
-tools:
-  default:
-    path: "features/tools/templates/system.jinja"
-    version: "1.0"
-extract:
-  default:
-    path: "features/extract/templates/system.jinja"
-    version: "1.0"
-skills_orchestrator:
-  default:
-    path: "features/skills/templates/orchestrator.jinja"
-    version: "1.0"
-tasks_orchestrator:
-  default:
-    path: "features/tasks/templates/orchestrator.jinja"
-    version: "1.0"
 generalist:
   default:
     path: "agents/templates/generalist/system.jinja"

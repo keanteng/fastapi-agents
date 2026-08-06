@@ -30,16 +30,8 @@ import app.agents.memory.models  # noqa: F401 -- registers ORM on Base.metadata
 import app.agents.skills as skills_module
 import app.agents.tools as tools_module
 import app.core.db as db_module
-import app.features.skills.skills.skills as skill_factory_module  # legacy slice
-import app.features.tools.tools as tools_tools_module  # legacy slice
 from app.agents.memory.models import Conversation, Message
 from app.core.db import Base, get_session
-from app.features.chat.agent import chat_agent
-from app.features.extract.agent import extract_agent
-from app.features.memory.agent import memory_agent
-from app.features.skills.agent import skills_agent
-from app.features.tasks.orchestrator import tasks_agent
-from app.features.tools.agent import tools_agent
 from app.main import app as fastapi_app
 
 # ----- Shared SQLite engine for the test session -----------------------------
@@ -164,43 +156,8 @@ def patch_models(monkeypatch) -> Iterator[None]:
         lambda: TestModel(custom_output_text="skill-output"),
     )
 
-    # Legacy slice: keep the old slice agents on TestModel until they are deleted.
-    monkeypatch.setattr(
-        skill_factory_module,
-        "get_model",
-        lambda: TestModel(custom_output_text="skill-output"),
-    )
-
-    chat_agent._model = TestModel(custom_output_text="chat-response")
-    memory_agent._model = TestModel(custom_output_text="memory-response")
-    extract_agent._model = TestModel()
-
-    tools_agent._model = ScriptedTestModel(
-        call_tools=["calculator", "current_time"],
-        tool_args={"calculator": {"expression": "1+1"}},
-        custom_output_text="tools-done",
-    )
-
-    skills_agent._model = ScriptedTestModel(
-        call_tools=["dispatch_skill"],
-        tool_args={
-            "dispatch_skill": {
-                "skill_name": "summarizer",
-                "input_text": "Hello world. This is a test.",
-            }
-        },
-        custom_output_text="skills-done",
-    )
-
-    tasks_agent._model = ScriptedTestModel(
-        call_tools=["delegate_chat"],
-        tool_args={"delegate_chat": {"subtask": "greet the user"}},
-        custom_output_text="tasks-done",
-    )
-
-    # Safety net so no fetch tool ever touches the network.
-    monkeypatch.setattr(tools_tools_module, "http_fetch", lambda *a, **k: "stub-body")
-
+    # Safety net so the fetch tool never touches the network. The stub keeps
+    # http_fetch's real signature so the generated tool schema is unchanged.
     async def _stub_http_fetch(url: str, *, timeout: float = 10.0) -> str:
         return "stub-body"
 
