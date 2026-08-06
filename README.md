@@ -1,12 +1,12 @@
 # agents
 
-FastAPI server showcasing [pydantic-ai](https://ai.pydantic.dev/) with the
-[DeepSeek](https://deepseek.com) model, organised using **vertical slice
-architecture**. Each feature (chat, memory, tools, skills, multi-step tasks,
-structured extraction) owns its router, schemas, service, agent, tools and
-Jinja templates.
+FastAPI server showcasing [pydantic-ai](https://ai.pydantic.dev/) 2.x with the
+[DeepSeek](https://deepseek.com) model, organised around **runs** instead of
+one-endpoint-per-capability. The public surface is a run-centric, Agent
+Protocol-flavoured HTTP API plus a standalone MCP server; everything else is an
+internal module.
 
-## Run
+## Quick start
 
 ```bash
 cp .env.example .env      # set DEEPSEEK_API_KEY and DATABASE_URL
@@ -17,45 +17,187 @@ uv run uvicorn app.main:app --reload
 
 Browse http://localhost:8000/docs.
 
-## Database
-
-Conversation memory is persisted in Postgres via async SQLAlchemy
-(`asyncpg`) with Alembic migrations. Set `DATABASE_URL` in `.env`; the
-engine pool is sized by `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`. Tests use an
-in-memory SQLite engine (see `tests/conftest.py`), so they don't need a
-running Postgres.
-
-Migrations live in `app/core/migrations`. To add one after changing ORM
-models in `app/features/<slice>/models.py`:
-
-```bash
-uv run alembic revision --autogenerate -m "describe change"
-uv run alembic upgrade head
-```
-
-> The ORM models for each slice must be imported by
-> `app/core/migrations/env.py` (or another `Base.metadata` collector) so
-> Alembic sees them — the memory slice is already wired up there.
-
 ## Endpoints
 
-| Method | Path                       | Showcase                                  |
-|--------|----------------------------|-------------------------------------------|
-| POST   | /api/v1/chat               | simple chat                               |
-| POST   | /api/v1/chat/stream        | streaming chat (SSE)                      |
-| POST   | /api/v1/memory             | provision a conversation (server uuid4)  |
-| GET    | /api/v1/memory/{conv_id}   | list conversation memory (stable DTOs)    |
-| POST   | /api/v1/memory/{conv_id}   | append a message to memory                |
-| DELETE | /api/v1/memory/{conv_id}   | clear memory                              |
-| POST   | /api/v1/memory/{conv_id}/chat | chat with message_history replay       |
-| POST   | /api/v1/tools              | function tool calling                     |
-| POST   | /api/v1/skills             | skills orchestration via tool dispatch   |
-| POST   | /api/v1/tasks              | multi-step task via delegating sub-agents |
-| POST   | /api/v1/extract            | structured output (Pydantic model)        |
+| Method | Path                        | Purpose                      | Success | Errors           |
+|--------|-----------------------------|------------------------------|---------|------------------|
+| POST   | /api/v1/runs                | Create a run                 | 202     | 422              |
+| GET    | /api/v1/runs                | List runs (newest first)     | 200     | —                |
+| GET    | /api/v1/runs/{run_id}       | Run status/steps/artifacts   | 200     | 404              |
+| GET    | /api/v1/runs/{run_id}/events| SSE event stream             | 200     | 404, 409         |
+| POST   | /api/v1/runs/{run_id}/cancel| Cancel a run                 | 202     | 404, 409         |
+| GET    | /api/v1/agents              | List declarative agent specs | 200     | —                |
+| GET    | /api/v1/agents/{name}       | Single agent spec            | 200     | 404              |
 
-`GET /api/v1/memory/{conv_id}` returns `messages` as stable DTOs
-(`MessageOut`/`PartOut`) decoupled from pydantic-ai's internal message
-shape; raw `ModelMessage` payloads are still what's stored on disk.
+The old endpoint namespaces (`/api/v1/chat*`, `/api/v1/memory*`,
+`/api/v1/tools`, `/api/v1/skills`, `/api/v1/tasks`, `/api/v1/extract`) are
+**removed** and do not redirect. Use the run API instead:
+
+- Chat / tools / skills / multi-step tasks / memory → a run of the
+  **`generalist`** agent.
+- Structured extraction → a run of the **`extractor`** agent.
+
+### Create a run
+
+```bash
+curl -i -X POST http://localhost:8000/api/v1/runs \
+  -H 'content-type: application/json' \
+  -d '{"agent":"generalist","input":"What is (1+2)*3?","max_steps":8}'
+```
+
+Returns `202 Accepted` with a `RunResponse` in `status: "pending"`:
+
+```json
+{
+  "run_id": "…",
+  "agent": "generalist",
+  "status": "pending",
+  "conversation_id": null,
+  "created_at": "…",
+  "started_at": null,
+  "finished_at": null,
+  "steps": [],
+  "artifacts": [],
+  "usage": null,
+  "error": null
+}
+```
+
+`conversation_id` is minted by the server for memory-enabled agents and
+returned once the run starts. `message_history` (`{role, content}` pairs)
+replays explicit multi-turn context and takes precedence over stored history.
+`tools` restricts the agent to a subset of its tools by name; `capabilities`
+enables declared capabilities (e.g. `["thinking"]`); `max_steps` bounds model
+requests (1-20, default 8); `metadata` is echoed in the run record.
+
+### Poll
+
+```bash
+curl http://localhost:8000/api/v1/runs/<run_id>
+```
+
+Returns the authoritative `RunResponse` at any time — status, accumulated
+`steps`, `artifacts`, `usage`, and `error` — whether or not anything is
+subscribed to the event stream.
+
+### Stream
+
+```bash
+curl -N http://localhost:8000/api/v1/runs/<run_id>/events
+```
+
+`text/event-stream` frames with an OpenAI-Responses-shaped envelope:
+
+```
+event: response.created
+data: {"type":"response.created","run_id":"…","sequence":1,"created_at":"…","data":{"agent":"generalist","conversation_id":"…","input":"…"}}
+```
+
+Event types: `response.created`, `response.output_text.delta`,
+`response.output_text.done`, `run.step`, `response.completed`,
+`response.failed`, `run.cancelled`, `ping`. Every event carries `type`,
+`run_id`, `sequence` (monotonic, starts at 1) and `created_at`. The terminal
+event (`response.completed` / `response.failed` / `run.cancelled`) is always
+the last frame, after which the server closes the stream.
+
+`response.output_text.*` events are emitted **only** by string-output agents
+(`generalist`). Structured-output agents (`extractor`) emit
+`response.created` → (optional `run.step`) → `response.completed` with a
+`structured_output` artifact.
+
+At most **one** SSE subscriber is accepted per run; a second subscriber gets
+`409 sse_busy`. After the sole subscriber disconnects, no further subscriber
+is accepted — reconnect via polling.
+
+### Cancel
+
+```bash
+curl -i -X POST http://localhost:8000/api/v1/runs/<run_id>/cancel
+```
+
+`202` with the run in `status: "cancelled"`; cancelling a terminal run yields
+`409 cancel_conflict`; an unknown run yields `404`.
+
+## Run lifecycle
+
+```
+pending ──► running ──► completed
+              │  │
+              │  └──► failed (exception / retry budget / RUN_TIMEOUT_SECONDS)
+              └────► cancelled (cancel request from pending or running)
+```
+
+Runs live **in memory** and die with the process: there is no run persistence
+and no queue. Treat `404 run_not_found` after a restart as "the run is gone".
+
+## Errors
+
+Every error response uses one envelope:
+
+```json
+{ "error": { "code": "…", "message": "…", "details": null, "run_id": null } }
+```
+
+Codes: `validation_error` (422), `unknown_agent` (422), `run_not_found` (404),
+`agent_not_found` (404), `sse_busy` (409), `cancel_conflict` (409),
+`internal_error` (500). Run-level failures are recorded in the run's `error`
+field and the `response.failed` event with codes `timeout`, `model_error`, or
+`tool_error`.
+
+## MCP server
+
+A standalone [FastMCP](https://github.com/modelcontextprotocol/python-sdk)
+server (stdio) exposes the same tools and skills as the run API:
+
+```bash
+uv run python -m app.mcp_server
+# or: uv run agents-mcp
+```
+
+Exposed surface:
+
+- **Tools:** `calculator(expression)`, `fetch(url)`, `current_time()`,
+  `dispatch_skill(skill_name, input_text)`.
+- **Prompts:** `summarizer(text)`, `translator(text, target_language)`,
+  `code_reviewer(code)`.
+- **Resource:** `agents://catalog` — JSON listing every agent spec.
+
+Example with Claude:
+
+```bash
+claude mcp add agents -- uv run python -m app.mcp_server
+```
+
+Memory is intentionally not exposed over MCP; it belongs to the run API's
+`conversation_id` contract.
+
+## Agent specs
+
+Agents are declarative YAML files in `app/agents/specs/`. To add an agent,
+drop in a spec:
+
+```yaml
+name: myagent
+description: "What this agent does."
+instructions: generalist       # key into app/core/prompts.yml
+output_type: string            # or structured_output
+tools: [calculator]            # names from the shared registry
+capabilities: []
+uses_memory: false
+default_max_steps: 8
+```
+
+Specs are validated at startup by the `AgentDefinition` pydantic model; a bad
+spec fails fast. The registry (`app/agents/registry.py`) resolves them into
+pydantic-ai agents with `tools=` registration, capabilities, and output
+schemas.
+
+## Database
+
+Conversation memory is persisted in Postgres via async SQLAlchemy (`asyncpg`)
+with Alembic migrations; the schema is unchanged. Tests use an in-memory
+SQLite engine (`tests/conftest.py`), so they need no running Postgres.
+Migrations live in `app/core/migrations`.
 
 ## Tests
 
@@ -63,4 +205,5 @@ shape; raw `ModelMessage` payloads are still what's stored on disk.
 uv run pytest
 ```
 
-Powered by pydantic-ai `TestModel` -- no network calls.# fastapi-agents
+Powered by pydantic-ai `TestModel`/`ScriptedTestModel`, in-memory SQLite, and
+a stubbed `http_fetch` — no network calls.

@@ -4619,10 +4619,12 @@ git commit -m "refactor: delete legacy features slice and obsolete tests"
 
 ## Task 11: Docs — README rewrite and final run
 
+> Status: COMPLETE (committed)
+
 **Files:**
 - Rewrite: `README.md`
 
-- [ ] **Step 1: Rewrite the README**
+- [x] **Step 1: Rewrite the README**
 
 Replace the entire contents of `README.md` with:
 
@@ -4838,12 +4840,12 @@ Powered by pydantic-ai `TestModel`/`ScriptedTestModel`, in-memory SQLite, and
 a stubbed `http_fetch` — no network calls.
 ````
 
-- [ ] **Step 2: Final full-suite run**
+- [x] **Step 2: Final full-suite run**
 
 Run: `uv run pytest -q`
 Expected: `88 passed`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md
