@@ -1898,6 +1898,8 @@ git commit -m "refactor: move memory layer under app/agents/memory"
 
 ## Task 5: Run models + in-memory registry
 
+> Status: COMPLETE (committed; events.py pulled in from Task 6 because registry.py imports it; seq starts at 1 per spec §4.5)
+
 **Files:**
 - Rewrite: `app/runs/models.py` (full run models; `ErrorBody` unchanged)
 - Create: `app/runs/registry.py`
@@ -1905,7 +1907,7 @@ git commit -m "refactor: move memory layer under app/agents/memory"
 - Test: `tests/test_runs_models.py`
 - Test: `tests/test_runs_registry.py`
 
-- [ ] **Step 1: Write the failing model tests**
+- [x] **Step 1: Write the failing model tests**
 
 Create `tests/test_runs_models.py`:
 
@@ -1991,12 +1993,12 @@ def test_run_response_from_record() -> None:
     assert response.error is None
 ```
 
-- [ ] **Step 2: Run the model tests to verify they fail**
+- [x] **Step 2: Run the model tests to verify they fail**
 
 Run: `uv run pytest tests/test_runs_models.py -v`
 Expected: FAIL with `ImportError: cannot import name 'RunStatus' from 'app.runs.models'`.
 
-- [ ] **Step 3: Write the failing registry tests**
+- [x] **Step 3: Write the failing registry tests**
 
 Create `tests/test_runs_registry.py`:
 
@@ -2107,12 +2109,12 @@ async def test_claim_subscriber_replays_buffered_events() -> None:
     assert [e.type for e in replay] == ["response.created", "response.output_text.done"]
 ```
 
-- [ ] **Step 4: Run the registry tests to verify they fail**
+- [x] **Step 4: Run the registry tests to verify they fail**
 
 Run: `uv run pytest tests/test_runs_registry.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.runs.registry'`.
 
-- [ ] **Step 5: Rewrite `app/runs/models.py` with the full run models**
+- [x] **Step 5: Rewrite `app/runs/models.py` with the full run models**
 
 Replace the entire contents of `app/runs/models.py` with:
 
@@ -2252,7 +2254,7 @@ class RunResponse(BaseModel):
         )
 ```
 
-- [ ] **Step 6: Create `app/runs/registry.py`**
+- [x] **Step 6: Create `app/runs/registry.py`**
 
 Create `app/runs/registry.py`:
 
@@ -2479,7 +2481,7 @@ class RunRegistry:
         return None
 ```
 
-- [ ] **Step 7: Add the run registry to the container**
+- [x] **Step 7: Add the run registry to the container**
 
 In `app/core/container.py`, make these three edits:
 
@@ -2525,17 +2527,17 @@ def build_container(config: Settings | None = None) -> AppContainer:
     return container
 ```
 
-- [ ] **Step 8: Run the new tests**
+- [x] **Step 8: Run the new tests**
 
 Run: `uv run pytest tests/test_runs_models.py tests/test_runs_registry.py -v`
 Expected: `14 passed` (6 models + 8 registry).
 
-- [ ] **Step 9: Run the whole suite**
+- [x] **Step 9: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `47 passed` (33 + 14 new).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add app/runs/models.py app/runs/registry.py app/core/container.py tests/test_runs_models.py tests/test_runs_registry.py

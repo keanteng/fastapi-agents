@@ -9,6 +9,7 @@ from app.agents.registry import AgentRegistry, load_agent_registry
 from app.core.config import Settings
 from app.core.model import get_model
 from app.core.prompts import PromptEngine
+from app.runs.registry import RunRegistry
 
 
 @dataclass
@@ -19,6 +20,7 @@ class AppContainer:
     model: OpenAIChatModel
     prompts: PromptEngine
     agents: AgentRegistry
+    runs: RunRegistry
 
 
 _container: AppContainer | None = None
@@ -33,6 +35,7 @@ def build_container(config: Settings | None = None) -> AppContainer:
         model=get_model(),
         prompts=PromptEngine(),
         agents=load_agent_registry(),
+        runs=RunRegistry(),
     )
     _container = container
     return container
