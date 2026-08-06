@@ -40,7 +40,7 @@ class AgentRegistry:
         tools: list[str] | None = None,
         capabilities: list[str] | None = None,
         model: Any | None = None,
-    ) -> Agent:
+    ) -> Agent[None, Any]:
         """Resolve a spec and build a pydantic-ai ``Agent`` for one run."""
         definition = self.definitions.get(name)
         if definition is None:

@@ -142,7 +142,9 @@ def patch_models(monkeypatch) -> Iterator[None]:
     monkeypatch.setattr(
         build_module,
         "get_model",
-        lambda: _model_holder.current if _model_holder.current is not None else TestModel(),
+        lambda: (
+            _model_holder.current if _model_holder.current is not None else TestModel()
+        ),
     )
     monkeypatch.setattr(
         skills_module,
