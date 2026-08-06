@@ -4168,12 +4168,14 @@ git commit -m "feat: add runs and agents HTTP routers with error and SSE envelop
 
 ## Task 9: MCP server (FastMCP, stdio)
 
+> Status: COMPLETE (committed; test wraps call_tool in a typed helper with `cast` because FastMCP 1.28's declared return type is inaccurate, and uses `list()` on the read_resource Iterable)
+
 **Files:**
 - Create: `app/mcp_server.py`
 - Modify: `pyproject.toml` (add `[project.scripts]` entry)
 - Test: `tests/test_mcp.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_mcp.py`:
 
@@ -4222,12 +4224,12 @@ async def test_catalog_resource_lists_agents() -> None:
     assert agent_names == {"generalist", "extractor"}
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_mcp.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.mcp_server'`.
 
-- [ ] **Step 3: Create `app/mcp_server.py`**
+- [x] **Step 3: Create `app/mcp_server.py`**
 
 Create `app/mcp_server.py`:
 
@@ -4326,7 +4328,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Add the console-script entry point**
+- [x] **Step 4: Add the console-script entry point**
 
 In `pyproject.toml`, after the `[tool.pytest.ini_options]` block, append:
 
@@ -4335,17 +4337,17 @@ In `pyproject.toml`, after the `[tool.pytest.ini_options]` block, append:
 agents-mcp = "app.mcp_server:main"
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `uv run pytest tests/test_mcp.py -v`
 Expected: `6 passed`.
 
-- [ ] **Step 6: Run the whole suite**
+- [x] **Step 6: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `93 passed` (87 + 6 new).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/mcp_server.py pyproject.toml tests/test_mcp.py
