@@ -1,0 +1,51 @@
+name: extractor
+description: "Structured entity-extraction agent with no tools and no memory."
+instructions: extractor
+model: null
+output_type: structured_output
+output_schema:
+  title: ExtractionResult
+  type: object
+  description: Structured output the agent must return.
+  properties:
+    entities:
+      title: Entities
+      type: array
+      items:
+        $ref: "#/$defs/Entity"
+    language:
+      title: Language
+      anyOf:
+        - type: string
+        - type: "null"
+      default: null
+      description: Detected dominant language code (e.g. 'en').
+    summary:
+      title: Summary
+      type: string
+      default: ""
+      description: One-sentence summary of the input.
+  $defs:
+    Entity:
+      title: Entity
+      type: object
+      properties:
+        name:
+          title: Name
+          type: string
+          description: The entity's surface form.
+        type:
+          title: Type
+          type: string
+          description: PER, ORG, LOC, DATE, MISC.
+        confidence:
+          title: Confidence
+          type: number
+          default: 0.0
+          minimum: 0.0
+          maximum: 1.0
+      required: [name, type]
+capabilities: []
+tools: []
+uses_memory: false
+default_max_steps: 8

@@ -23,6 +23,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+import app.agents.build as build_module
 import app.agents.skills as skills_module
 import app.agents.tools as tools_module
 import app.core.db as db_module
@@ -136,8 +137,13 @@ def agent_model() -> Iterator[Any]:
 
 @pytest.fixture(autouse=True)
 def patch_models(monkeypatch) -> Iterator[None]:
-    # New layer: skill factories get TestModel. ``app.agents.build`` gets its
-    # TestModel patch added in Task 3 (when that module is created).
+    # Every agent built by build_agent gets TestModel (per-test override via
+    # the ``agent_model`` fixture).
+    monkeypatch.setattr(
+        build_module,
+        "get_model",
+        lambda: _model_holder.current if _model_holder.current is not None else TestModel(),
+    )
     monkeypatch.setattr(
         skills_module,
         "get_model",
@@ -181,7 +187,7 @@ def patch_models(monkeypatch) -> Iterator[None]:
     # Safety net so no fetch tool ever touches the network.
     monkeypatch.setattr(tools_tools_module, "http_fetch", lambda *a, **k: "stub-body")
 
-    async def _stub_http_fetch(*args: Any, **kwargs: Any) -> str:
+    async def _stub_http_fetch(url: str, *, timeout: float = 10.0) -> str:
         return "stub-body"
 
     monkeypatch.setattr(tools_module, "http_fetch", _stub_http_fetch)

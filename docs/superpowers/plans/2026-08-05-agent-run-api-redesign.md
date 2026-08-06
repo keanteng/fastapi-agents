@@ -872,6 +872,8 @@ git commit -m "feat: add shared tools and skills modules (pydantic-ai 2.x)"
 
 ## Task 3: Agent specs, registry, builder, templates
 
+> Status: COMPLETE (uncommitted; deviates from the plan's test ordering in three tests so `agent_model` is set before `build_agent`, since the model resolves eagerly; conftest fetch stub keeps the real `http_fetch` signature)
+
 **Files:**
 - Create: `app/agents/definitions.py`
 - Create: `app/agents/models/__init__.py`
@@ -890,7 +892,7 @@ git commit -m "feat: add shared tools and skills modules (pydantic-ai 2.x)"
 - Modify: `app/core/container.py` (add `agents: AgentRegistry` to the container)
 - Test: `tests/test_agents_registry.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_agents_registry.py`:
 
@@ -1029,12 +1031,12 @@ def test_build_agent_delegation_runs(agent_model) -> None:
     assert asyncio.run(_run()) == "outer-done"
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/test_agents_registry.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.agents.definitions'`.
 
-- [ ] **Step 3: Create the definition model**
+- [x] **Step 3: Create the definition model**
 
 Create `app/agents/definitions.py`:
 
@@ -1061,7 +1063,7 @@ class AgentDefinition(BaseModel):
     default_max_steps: int = 8
 ```
 
-- [ ] **Step 4: Create the extraction models**
+- [x] **Step 4: Create the extraction models**
 
 Create `app/agents/models/__init__.py`:
 
@@ -1093,7 +1095,7 @@ class ExtractionResult(BaseModel):
     summary: str = Field(default="", description="One-sentence summary of the input.")
 ```
 
-- [ ] **Step 5: Create the delegation tools**
+- [x] **Step 5: Create the delegation tools**
 
 Create `app/agents/delegation.py`:
 
@@ -1143,7 +1145,7 @@ def make_delegate_tools(build_agent: Callable) -> dict[str, Callable]:
     }
 ```
 
-- [ ] **Step 6: Create the agent builder**
+- [x] **Step 6: Create the agent builder**
 
 Create `app/agents/build.py`:
 
@@ -1217,7 +1219,7 @@ def build_agent(
     )
 ```
 
-- [ ] **Step 7: Create the agent registry**
+- [x] **Step 7: Create the agent registry**
 
 Create `app/agents/registry.py`:
 
@@ -1285,7 +1287,7 @@ def load_agent_registry() -> AgentRegistry:
     return AgentRegistry(definitions)
 ```
 
-- [ ] **Step 8: Create the agent spec YAML files**
+- [x] **Step 8: Create the agent spec YAML files**
 
 Create `app/agents/specs/generalist.yaml`:
 
@@ -1359,7 +1361,7 @@ uses_memory: false
 default_max_steps: 8
 ```
 
-- [ ] **Step 9: Create the prompt templates**
+- [x] **Step 9: Create the prompt templates**
 
 Create `app/agents/templates/generalist/system.jinja`:
 
@@ -1404,7 +1406,7 @@ You are a code reviewer. Review the user's snippet and list concrete issues
 grouped as: Correctness, Style, Performance. Be terse. Suggest fixes.
 ```
 
-- [ ] **Step 10: Update `app/core/prompts.yml`**
+- [x] **Step 10: Update `app/core/prompts.yml`**
 
 Replace the entire contents of `app/core/prompts.yml` with:
 
@@ -1462,7 +1464,7 @@ skill_code_reviewer:
 
 (Note: the obsolete `chat`, `memory`, `tools`, `extract`, `skills_orchestrator`, and `tasks_orchestrator` keys are kept here because the legacy feature agents still render them; they are removed in Task 10 alongside `app/features/`.)
 
-- [ ] **Step 11: Add the agent registry to the container**
+- [x] **Step 11: Add the agent registry to the container**
 
 Replace the entire contents of `app/core/container.py` with:
 
@@ -1531,7 +1533,7 @@ def close_container() -> None:
     _container = None
 ```
 
-- [ ] **Step 12: Wire the `build_agent` TestModel patch into the conftest**
+- [x] **Step 12: Wire the `build_agent` TestModel patch into the conftest**
 
 In `tests/conftest.py`, make two edits.
 
@@ -1564,17 +1566,17 @@ def patch_models(monkeypatch) -> Iterator[None]:
     )
 ```
 
-- [ ] **Step 13: Run the new tests**
+- [x] **Step 13: Run the new tests**
 
 Run: `uv run pytest tests/test_agents_registry.py -v`
 Expected: `9 passed`.
 
-- [ ] **Step 14: Run the whole suite**
+- [x] **Step 14: Run the whole suite**
 
 Run: `uv run pytest -q`
 Expected: `32 passed` (23 + 9 new).
 
-- [ ] **Step 15: Commit**
+- [x] **Step 15: Commit**
 
 ```bash
 git add app/agents/definitions.py app/agents/models/ app/agents/delegation.py app/agents/build.py app/agents/registry.py app/agents/specs/ app/agents/templates/ app/core/prompts.yml app/core/container.py tests/test_agents_registry.py tests/conftest.py

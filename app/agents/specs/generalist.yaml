@@ -1,0 +1,11 @@
+name: generalist
+description: "Conversational agent with tool calling, skill delegation, and memory."
+instructions: generalist
+model: null
+output_type: string
+output_schema: null
+capabilities: [thinking]
+tools: [calculator, fetch, current_time, dispatch_skill,
+        delegate_chat, delegate_tools, delegate_skill]
+uses_memory: true
+default_max_steps: 8

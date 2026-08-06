@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from fastapi import Request
 from pydantic_ai.models.openai import OpenAIChatModel
 
+from app.agents.registry import AgentRegistry, load_agent_registry
 from app.core.config import Settings
 from app.core.model import get_model
 from app.core.prompts import PromptEngine
@@ -17,6 +18,7 @@ class AppContainer:
     config: Settings
     model: OpenAIChatModel
     prompts: PromptEngine
+    agents: AgentRegistry
 
 
 _container: AppContainer | None = None
@@ -30,6 +32,7 @@ def build_container(config: Settings | None = None) -> AppContainer:
         config=resolved,
         model=get_model(),
         prompts=PromptEngine(),
+        agents=load_agent_registry(),
     )
     _container = container
     return container
