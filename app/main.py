@@ -7,6 +7,7 @@ centrally in ``core.middleware``; error handlers in ``api.errors``.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -18,6 +19,8 @@ from app.core.config import settings
 from app.core.container import build_container, close_container
 from app.core.db import dispose_db, init_db
 from app.core.middleware import register_middleware
+
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager

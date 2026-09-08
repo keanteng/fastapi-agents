@@ -19,7 +19,7 @@ def test_get_generalist_spec(client) -> None:
     assert spec["capabilities"] == ["thinking"]
     assert spec["uses_memory"] is True
     assert spec["instructions_key"] == "generalist"
-    assert spec["default_max_steps"] == 8
+    assert spec["default_max_steps"] == 16
 
 
 def test_get_extractor_schema(client) -> None:

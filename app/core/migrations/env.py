@@ -36,12 +36,14 @@ config = context.config
 
 
 def _sync_url(url: str) -> str:
-    """Replace the async driver with psycopg2 for alembic's sync runner."""
+    """Replace the async driver with a sync one for alembic's sync runner."""
     parsed = make_url(url)
     if parsed.drivername == "postgresql+asyncpg":
         return parsed.set(drivername="postgresql+psycopg2").render_as_string(
             hide_password=False
         )
+    if parsed.drivername == "sqlite+aiosqlite":
+        return parsed.set(drivername="sqlite").render_as_string(hide_password=False)
     return url
 
 

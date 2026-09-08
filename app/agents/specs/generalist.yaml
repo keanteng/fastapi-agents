@@ -8,4 +8,4 @@ capabilities: [thinking]
 tools: [calculator, fetch, current_time, dispatch_skill,
         delegate_chat, delegate_tools, delegate_skill]
 uses_memory: true
-default_max_steps: 8
+default_max_steps: 16

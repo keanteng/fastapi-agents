@@ -23,7 +23,7 @@ class CreateRunRequest(BaseModel):
     message_history: list[RunMessage] | None = None
     tools: list[str] | None = None
     capabilities: list[str] | None = None
-    max_steps: int = Field(default=8, ge=1, le=20)
+    max_steps: int | None = Field(default=None, ge=1, le=20)
     metadata: dict | None = None
 
 
@@ -38,6 +38,8 @@ async def create_run(body: CreateRunRequest, request: Request) -> RunResponse:
             f"unknown agent {body.agent!r}",
             details={"available": sorted(container.agents.definitions)},
         )
+    if body.max_steps is None:
+        body.max_steps = definition.default_max_steps
     record = await container.runs.create(body, container)
     return RunResponse.from_record(record)
 

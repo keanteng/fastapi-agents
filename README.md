@@ -68,7 +68,8 @@ returned once the run starts. `message_history` (`{role, content}` pairs)
 replays explicit multi-turn context and takes precedence over stored history.
 `tools` restricts the agent to a subset of its tools by name; `capabilities`
 enables declared capabilities (e.g. `["thinking"]`); `max_steps` bounds model
-requests (1-20, default 8); `metadata` is echoed in the run record.
+requests (1-20); when omitted the agent spec's `default_max_steps` is used
+(`generalist`: 16, `extractor`: 8); `metadata` is echoed in the run record.
 
 ### Poll
 

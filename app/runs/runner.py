@@ -219,7 +219,7 @@ async def _execute_agent(
                     usage_limits=usage_limits(request.max_steps),
                     event_stream_handler=step_handler,
                 ) as stream:
-                    async for delta in stream.stream_text():
+                    async for delta in stream.stream_text(delta=True):
                         text += delta
                         await registry.emit(
                             record, "response.output_text.delta", delta_data(delta)

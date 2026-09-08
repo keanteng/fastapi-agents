@@ -50,7 +50,7 @@ def safe_eval(expression: str) -> float | int:
 
 async def http_fetch(url: str, *, timeout: float = 10.0) -> str:
     """Fetch up to 4096 chars of text from an HTTP URL."""
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         response = await client.get(url)
         response.raise_for_status()
     return response.text[:4096]
