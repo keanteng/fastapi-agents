@@ -1,0 +1,33 @@
+# Central prompt catalog.
+# Maps a logical ``task`` (and optional ``variant``) to a template path and a
+# version, so business code references prompts by name instead of file paths.
+# Every path is validated at startup by ``PromptEngine``.
+
+generalist:
+  default:
+    path: "agents/templates/generalist/system.jinja"
+    version: "1.0"
+extractor:
+  default:
+    path: "agents/templates/extractor/system.jinja"
+    version: "1.0"
+skill_summarizer:
+  default:
+    path: "agents/templates/skills/summarizer.jinja"
+    version: "1.0"
+skill_translator:
+  default:
+    path: "agents/templates/skills/translator.jinja"
+    version: "1.0"
+skill_code_reviewer:
+  default:
+    path: "agents/templates/skills/code_reviewer.jinja"
+    version: "1.0"
+compliance_visual_analysis:
+  default:
+    path: "agents/templates/compliance/visual.jinja"
+    version: "1.0"
+compliance_verdict:
+  default:
+    path: "agents/templates/compliance/verdict.jinja"
+    version: "1.0"

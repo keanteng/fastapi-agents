@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agents chat</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="drop-overlay" hidden>
+      <p>Drop a file to upload and run a compliance check</p>
+    </div>
+
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <h1>Agents</h1>
+          <button id="new-chat" type="button" class="primary">+ New chat</button>
+        </div>
+        <div class="sidebar-upload">
+          <button id="attach" type="button">Upload file</button>
+          <span>drop a file to run a compliance check</span>
+        </div>
+        <ul id="conversation-list" class="conversation-list"></ul>
+      </aside>
+
+      <main class="chat">
+        <header class="chat-head">
+          <select id="agent" title="Agent"></select>
+          <span class="meta-pill">conv <span id="conv-label">none</span></span>
+          <span id="status" class="status-idle">idle</span>
+          <button id="stop" type="button" hidden>Stop</button>
+        </header>
+
+        <section id="messages" aria-live="polite"></section>
+
+        <footer class="composer">
+          <form id="composer-form">
+            <textarea
+              id="composer-input"
+              rows="1"
+              placeholder="Ask anything… or upload a file to check it for PII / sensitive content"
+            ></textarea>
+            <button id="composer-send" type="submit" class="primary">Send</button>
+          </form>
+        </footer>
+      </main>
+    </div>
+
+    <input id="file-input" type="file" hidden />
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
