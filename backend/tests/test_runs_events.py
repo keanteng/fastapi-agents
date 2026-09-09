@@ -53,22 +53,13 @@ def test_generalist_stream_envelope_and_order(client, agent_model) -> None:
     assert delta_idx < done_idx < len(types) - 1
 
 
-def test_extractor_stream_has_no_text_events(client) -> None:
+def test_retired_extractor_agent_is_rejected(client) -> None:
     r = client.post(
         "/api/v1/runs",
         json={"agent": "extractor", "input": "Satya Nadella runs Microsoft."},
     )
-    run_id = r.json()["run_id"]
-    wait_for_status(client, run_id, "completed")
-
-    with client.stream("GET", f"/api/v1/runs/{run_id}/events") as resp:
-        lines = [ln for ln in resp.iter_lines() if ln]
-
-    frames = _parse_frames(lines)
-    types = [f["event"] for f in frames]
-    assert types == ["response.created", "response.completed"]
-    artifact = frames[-1]["data"]["data"]["artifacts"][0]
-    assert artifact["kind"] == "structured_output"
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "unknown_agent"
 
 
 def test_stream_unknown_run_404(client) -> None:

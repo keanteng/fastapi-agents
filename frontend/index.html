@@ -8,7 +8,7 @@
   </head>
   <body>
     <div id="drop-overlay" hidden>
-      <p>Drop a file to upload and run a compliance check</p>
+      <p>Drop a file to attach it for reading, extraction or a compliance check</p>
     </div>
 
     <div class="app">
@@ -18,15 +18,14 @@
           <button id="new-chat" type="button" class="primary">+ New chat</button>
         </div>
         <div class="sidebar-upload">
-          <button id="attach" type="button">Upload file</button>
-          <span>drop a file to run a compliance check</span>
+          <button id="attach" type="button">Attach file</button>
+          <span>attach a file and I'll read, extract or check it</span>
         </div>
         <ul id="conversation-list" class="conversation-list"></ul>
       </aside>
 
       <main class="chat">
         <header class="chat-head">
-          <select id="agent" title="Agent"></select>
           <span class="meta-pill">conv <span id="conv-label">none</span></span>
           <span id="status" class="status-idle">idle</span>
           <button id="stop" type="button" hidden>Stop</button>
@@ -39,7 +38,7 @@
             <textarea
               id="composer-input"
               rows="1"
-              placeholder="Ask anything… or upload a file to check it for PII / sensitive content"
+              placeholder="Ask anything — attach a file and I'll decide how to help"
             ></textarea>
             <button id="composer-send" type="submit" class="primary">Send</button>
           </form>

@@ -41,9 +41,22 @@ def test_run_usage_from_pai() -> None:
         input_tokens = 10
         output_tokens = 20
         requests = 3
+        tool_calls = 5
 
     usage = RunUsage.from_pai(FakeUsage())
-    assert usage == RunUsage(input_tokens=10, output_tokens=20, requests=3)
+    assert usage == RunUsage(
+        input_tokens=10, output_tokens=20, requests=3, tool_calls=5
+    )
+
+
+def test_run_usage_from_pai_missing_tool_calls_defaults_to_zero() -> None:
+    class MinimalUsage:
+        input_tokens = 1
+        output_tokens = 2
+        requests = 1
+
+    usage = RunUsage.from_pai(MinimalUsage())
+    assert usage.tool_calls == 0
 
 
 def test_run_record_initial_state() -> None:
@@ -53,6 +66,7 @@ def test_run_record_initial_state() -> None:
     assert record.artifacts == []
     assert record.usage is None
     assert record.error is None
+    assert record.note is None
     assert record.seq_counter == 0
     assert record.sse_claimed is False
     assert len(record.events) == 0

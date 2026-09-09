@@ -1,4 +1,5 @@
 import type { MessageOut, PartOut } from "./types";
+import { renderMarkdown } from "./markdown";
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -143,12 +144,12 @@ export function createAssistantTurn(container: HTMLElement): AssistantTurn {
     element: turn,
     addText(delta: string) {
       text += delta;
-      ensureTextEl().textContent = text;
+      ensureTextEl().innerHTML = renderMarkdown(text);
       scrollToBottom(container);
     },
     replaceText(full: string) {
       text = full;
-      ensureTextEl().textContent = text;
+      ensureTextEl().innerHTML = renderMarkdown(text);
       scrollToBottom(container);
     },
     addTool: addToolCard,

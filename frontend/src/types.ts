@@ -32,6 +32,7 @@ export interface RunResponse {
   artifacts: { name: string; kind: string; data: unknown }[];
   usage: { input_tokens: number; output_tokens: number; requests: number } | null;
   error: { code: string; message: string } | null;
+  note: string | null;
 }
 
 export interface RunEvent {

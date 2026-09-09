@@ -46,4 +46,4 @@ async def test_catalog_resource_lists_agents() -> None:
     contents = list(await mcp_app.read_resource("agents://catalog"))
     payload = json.loads(contents[0].content)
     agent_names = {agent["name"] for agent in payload["agents"]}
-    assert agent_names == {"generalist", "extractor"}
+    assert agent_names == {"generalist"}

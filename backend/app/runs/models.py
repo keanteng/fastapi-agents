@@ -55,6 +55,7 @@ class RunUsage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     requests: int = 0
+    tool_calls: int = 0
 
     @classmethod
     def from_pai(cls, usage: Any) -> "RunUsage":
@@ -62,6 +63,7 @@ class RunUsage(BaseModel):
             input_tokens=getattr(usage, "input_tokens", 0) or 0,
             output_tokens=getattr(usage, "output_tokens", 0) or 0,
             requests=getattr(usage, "requests", 0) or 0,
+            tool_calls=getattr(usage, "tool_calls", 0) or 0,
         )
 
 
@@ -96,6 +98,7 @@ class RunRecord:
         self.artifacts: list[RunArtifact] = []
         self.usage: RunUsage | None = None
         self.error: ErrorBody | None = None
+        self.note: str | None = None
         self.task: asyncio.Task | None = None
         self.events: deque["RunEvent"] = deque(maxlen=EVENT_LOG_MAXLEN)
         self.event_ready: asyncio.Event = asyncio.Event()
@@ -116,6 +119,7 @@ class RunResponse(BaseModel):
     artifacts: list[RunArtifact] = Field(default_factory=list)
     usage: RunUsage | None = None
     error: ErrorBody | None = None
+    note: str | None = None
 
     @classmethod
     def from_record(cls, record: RunRecord) -> "RunResponse":
@@ -131,4 +135,5 @@ class RunResponse(BaseModel):
             artifacts=list(record.artifacts),
             usage=record.usage,
             error=record.error,
+            note=record.note,
         )

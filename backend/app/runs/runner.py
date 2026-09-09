@@ -53,6 +53,26 @@ def usage_limits(max_steps: int) -> UsageLimits:
     )
 
 
+def step_budget_note(usage: RunUsage | None, max_steps: int) -> str | None:
+    """Return a note when a completed run used its full step budget.
+
+    A run that finishes with usage exactly at its limits has likely been cut off
+    mid-work (the model stopped producing tool calls because none were left),
+    so its final message may be an incomplete plan rather than an answer.
+    """
+    if usage is None:
+        return None
+    limits = usage_limits(max_steps)
+    if usage.requests >= limits.request_limit or usage.tool_calls >= limits.tool_calls_limit:
+        return (
+            "The agent stopped after using its full step budget "
+            f"({usage.requests} model request(s), {usage.tool_calls} tool call(s)); "
+            "the reply may be incomplete. Reply 'continue' to keep going, or "
+            "increase max_steps."
+        )
+    return None
+
+
 def run_messages_to_model_messages(messages: list[RunMessage]) -> list[Any]:
     """Convert API ``RunMessage`` DTOs into pydantic-ai ``ModelMessage``s."""
     from pydantic_ai.messages import (
@@ -268,6 +288,7 @@ async def _execute_agent(
             name="output", kind="structured_output", data=result.output
         )
 
+    record.note = step_budget_note(usage, request.max_steps or definition.default_max_steps)
     if definition.uses_memory:
         await _persist_history(record.conversation_id, all_messages)
     await _complete(record, registry, [artifact], usage)

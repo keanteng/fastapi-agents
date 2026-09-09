@@ -9,12 +9,11 @@ from app.agents.definitions import AgentDefinition
 from app.agents.registry import load_agent_registry
 
 
-def test_registry_loads_both_agents() -> None:
+def test_registry_loads_generalist() -> None:
     registry = load_agent_registry()
-    assert set(registry.definitions) == {"generalist", "extractor"}
+    assert set(registry.definitions) == {"generalist"}
     assert registry.definitions["generalist"].uses_memory is True
     assert registry.definitions["generalist"].output_type == "string"
-    assert registry.definitions["extractor"].output_type == "structured_output"
 
 
 def test_registry_tools_include_shared_and_delegation() -> None:
@@ -29,6 +28,7 @@ def test_registry_tools_include_shared_and_delegation() -> None:
         "delegate_skill",
         "document_text",
         "check_compliance",
+        "extract_entities",
     }
 
 
@@ -61,12 +61,12 @@ def test_build_agent_unknown_raises() -> None:
         registry.build_agent("nope")
 
 
-def test_build_agent_extractor_output_model() -> None:
+def test_extraction_definition_output_model() -> None:
+    from app.agents.build import resolve_output_model
+    from app.agents.extraction import EXTRACTION_DEFINITION
     from app.agents.models.extraction import ExtractionResult
 
-    registry = load_agent_registry()
-    agent = registry.build_agent("extractor")
-    assert agent.output_type is ExtractionResult
+    assert resolve_output_model(EXTRACTION_DEFINITION.output_schema) is ExtractionResult
 
 
 def test_build_agent_tool_filtering(agent_model) -> None:

@@ -13,7 +13,6 @@ import { attachRunStream } from "./stream";
 import type { RunStep, RunStatus } from "./types";
 
 // ----- DOM refs -------------------------------------------------------------
-const agentSelect = document.querySelector<HTMLSelectElement>("#agent")!;
 const composerForm = document.querySelector<HTMLFormElement>("#composer-form")!;
 const composerInput = document.querySelector<HTMLTextAreaElement>("#composer-input")!;
 const sendBtn = document.querySelector<HTMLButtonElement>("#composer-send")!;
@@ -60,6 +59,24 @@ function setComposerEnabled(enabled: boolean): void {
 }
 
 // ----- Conversation sidebar -------------------------------------------------
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (seconds < 45) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function renderConversationList(): void {
   conversationList.textContent = "";
   void api
@@ -75,12 +92,21 @@ function renderConversationList(): void {
         const open = document.createElement("button");
         open.type = "button";
         open.className = "conversation-open";
-        open.textContent =
-          conv.preview?.replace(/\s+/g, " ") || "(empty conversation)";
         open.title = new Date(conv.updated_at).toLocaleString();
         open.addEventListener("click", () =>
           void openConversation(conv.conversation_id),
         );
+
+        const preview = document.createElement("span");
+        preview.className = "conv-preview";
+        preview.textContent =
+          conv.preview?.replace(/\s+/g, " ") || "(empty conversation)";
+
+        const time = document.createElement("span");
+        time.className = "conv-time";
+        time.textContent = relativeTime(conv.updated_at);
+
+        open.append(preview, time);
 
         const del = document.createElement("button");
         del.type = "button";
@@ -155,7 +181,7 @@ async function refreshTranscript(): Promise<void> {
 }
 
 // ----- Run lifecycle --------------------------------------------------------
-async function sendMessage(text: string, attachment?: string, agent?: string): Promise<void> {
+async function sendMessage(text: string, attachment?: string): Promise<void> {
   const trimmed = text.trim();
   if (!trimmed || busy) return;
 
@@ -187,7 +213,7 @@ async function sendMessage(text: string, attachment?: string, agent?: string): P
     waitingEl = null;
   };
 
-  const body: Record<string, unknown> = { agent: agent ?? agentSelect.value, input: trimmed };
+  const body: Record<string, unknown> = { agent: "generalist", input: trimmed };
   if (activeConversationId) body.conversation_id = activeConversationId;
 
   try {
@@ -253,6 +279,7 @@ async function handleTerminal(run: {
   status: RunStatus;
   conversation_id: string | null;
   error: { code: string; message: string } | null;
+  note?: string | null;
 }): Promise<void> {
   busy = false;
   setComposerEnabled(true);
@@ -280,6 +307,7 @@ async function handleTerminal(run: {
     // reply is never missing.
     await refreshTranscript();
   }
+  if (run.note) note(run.note);
   renderConversationList();
   composerInput.focus();
 }
@@ -306,18 +334,21 @@ function note(text: string): void {
 
 async function handleFile(file: File): Promise<void> {
   if (busy || !file) return;
+  const typed = composerInput.value.trim();
+  composerInput.value = "";
+  autoResize(composerInput);
   setStatus("uploading");
   note(`Uploading ${file.name}…`);
   try {
     const upload = await api.upload(file);
-    note(`Uploaded ${upload.file_name}. Starting compliance check…`);
-    await sendMessage(
-      `Please check the uploaded file "${upload.file_name}" (upload id ${upload.upload_id}) ` +
-        `for compliance with our data-protection policy: PII, sensitive data and secrets. ` +
-        `Give the verdict and the reasons.`,
-      upload.file_name,
-      "generalist",
-    );
+    const fileRef = `attached file "${upload.file_name}" (upload id ${upload.upload_id})`;
+    const prompt = typed
+      ? `${typed}\n\n(context: the ${fileRef} is available — use it if relevant.)`
+      : `The user uploaded ${fileRef} but gave no instructions. Read the file, ` +
+        `summarise it, and offer next steps such as answering questions, ` +
+        `extracting entities, or running a compliance/PII check.`;
+    note(`Uploaded ${upload.file_name}.`);
+    await sendMessage(prompt, upload.file_name);
   } catch (err) {
     note(`Upload failed: ${messageOf(err)}`);
     setStatus("failed");
@@ -393,18 +424,6 @@ function init(): void {
     const file = event.dataTransfer?.files?.[0];
     if (file) void handleFile(file);
   });
-
-  void api
-    .agents()
-    .then((list) => {
-      for (const agent of list) {
-        const opt = document.createElement("option");
-        opt.value = agent.name;
-        opt.textContent = agent.name;
-        agentSelect.append(opt);
-      }
-    })
-    .catch((err) => appendError(messagesEl, `Failed to load agents: ${messageOf(err)}`));
 
   void renderConversationList();
   composerInput.focus();

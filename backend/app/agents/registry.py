@@ -24,7 +24,7 @@ class AgentRegistry:
         self._init_tools()
 
     def _init_tools(self) -> None:
-        from app.agents import tools as tools_module
+        from app.agents import extraction, tools as tools_module
         from app.documents.tools import make_document_tools
 
         self.tools = {
@@ -32,6 +32,7 @@ class AgentRegistry:
             "fetch": tools_module.http_fetch,
             "current_time": tools_module.current_time,
             "dispatch_skill": dispatch_skill,
+            "extract_entities": extraction.extract_entities,
         }
         self.tools.update(make_delegate_tools(self.build_agent))
         self.tools.update(make_document_tools())

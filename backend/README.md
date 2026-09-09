@@ -43,7 +43,9 @@ The old endpoint namespaces (`/api/v1/chat*`, `/api/v1/memory*`,
 
 - Chat / tools / skills / multi-step tasks / memory → a run of the
   **`generalist`** agent.
-- Structured extraction → a run of the **`extractor`** agent.
+- Structured extraction, document reading and compliance checks are **tools**
+  (`extract_entities`, `document_text`, `check_compliance`) the generalist
+  calls itself when asked — no separate agent mode is needed.
 
 ### Create a run
 
@@ -77,7 +79,10 @@ replays explicit multi-turn context and takes precedence over stored history.
 `tools` restricts the agent to a subset of its tools by name; `capabilities`
 enables declared capabilities (e.g. `["thinking"]`); `max_steps` bounds model
 requests (1-20); when omitted the agent spec's `default_max_steps` is used
-(`generalist`: 16, `extractor`: 8); `metadata` is echoed in the run record.
+(`generalist`: 16); `metadata` is echoed in the run record. `usage` reports
+tokens plus the model-request and tool-call counts; when a completed run used
+its whole step budget (the model stopped because no requests/tool calls were
+left), the run carries a `note` explaining the reply may be incomplete.
 
 ### Poll
 
@@ -115,10 +120,10 @@ running" card before the tool returns; the matching `run.step` carries the same
 `tool_call_id` once it finishes. `run.step` may also carry steps of type
 `progress` (long-running tools stream human-readable status lines this way).
 
-`response.output_text.*` events are emitted **only** by string-output agents
-(`generalist`). Structured-output agents (`extractor`) emit
-`response.created` → (optional `run.step`) → `response.completed` with a
-`structured_output` artifact.
+`response.output_text.*` events are emitted only by string-output agents — the
+single `generalist` agent. Sub-agent results (e.g. the JSON returned by the
+`extract_entities` tool) surface as `run.step` tool results, never as
+`output_text` events.
 
 At most **one** SSE subscriber is accepted per run; a second subscriber gets
 `409 sse_busy`. After the sole subscriber disconnects, no further subscriber
@@ -146,7 +151,7 @@ Uploads are stored under `UPLOAD_DIR` keyed by the sha1 of their bytes (so
 re-uploading identical content returns the same id). Allowed types: `pdf`,
 `docx`, `txt`, `md`, `png`, `jpg`, `jpeg`, `webp`.
 
-The **generalist** agent exposes two document tools:
+The **generalist** agent exposes three document/text tools:
 
 - `document_text(upload_id)` — textract-style text extraction
   (poppler `pdftotext`/`pdftoppm`, tesseract OCR for scans, `python-docx` for
@@ -157,6 +162,10 @@ The **generalist** agent exposes two document tools:
   → an LLM verdict (`overall_compliant`, `risk_level`, summary, findings with
   evidence/page/reason/recommendation). High-severity automated hits always
   override an LLM that would have missed them.
+- `extract_entities(text)` — runs an internal structured-output sub-agent
+  (`ExtractionResult`: PER/ORG/LOC/DATE/MISC entities, language, summary) and
+  returns JSON. The generalist calls it when asked to extract entities from a
+  message or an uploaded file (reading the file first via `document_text`).
 
 Progress inside long-running document tools is streamed as `run.step` events of
 type `progress`, so the web UI shows a live pipeline. Vision analysis is

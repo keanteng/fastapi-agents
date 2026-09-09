@@ -26,7 +26,7 @@ from app.runs.models import (
     RunUsage,
 )
 from app.runs.registry import RunRegistry
-from app.runs.runner import run_messages_to_model_messages
+from app.runs.runner import run_messages_to_model_messages, step_budget_note
 
 
 def _request(**overrides: object) -> types.SimpleNamespace:
@@ -123,6 +123,27 @@ def test_run_messages_conversion() -> None:
     assert type(converted[1]).__name__ == "ModelResponse"
 
 
+def test_step_budget_note_none_when_budget_remains() -> None:
+    usage = RunUsage(input_tokens=1, output_tokens=2, requests=3, tool_calls=2)
+    assert step_budget_note(usage, max_steps=8) is None
+    assert step_budget_note(None, max_steps=8) is None
+
+
+def test_step_budget_note_when_request_budget_exhausted() -> None:
+    usage = RunUsage(input_tokens=1, output_tokens=2, requests=6, tool_calls=2)
+    note = step_budget_note(usage, max_steps=2)
+    assert note is not None
+    assert "full step budget" in note
+    assert "6 model request(s)" in note
+
+
+def test_step_budget_note_when_tool_call_budget_exhausted() -> None:
+    usage = RunUsage(input_tokens=1, output_tokens=2, requests=4, tool_calls=16)
+    note = step_budget_note(usage, max_steps=16)
+    assert note is not None
+    assert "16 tool call(s)" in note
+
+
 async def test_runner_completes_string_run(agent_model) -> None:
     from pydantic_ai.models.test import TestModel
 
@@ -145,18 +166,32 @@ async def test_runner_completes_string_run(agent_model) -> None:
     assert "response.output_text.done" in types_
 
 
-async def test_runner_extractor_structured_artifact() -> None:
+async def test_runner_extract_tool_step_and_artifact(agent_model) -> None:
+    from tests.conftest import ScriptedTestModel
+
+    agent_model(
+        ScriptedTestModel(
+            call_tools="all",
+            tool_args={
+                "extract_entities": {"text": "Satya Nadella runs Microsoft."}
+            },
+        )
+    )
     container = get_container()
-    request = _request(agent="extractor", input="Satya Nadella runs Microsoft.")
+    request = _request(
+        agent="generalist",
+        input="extract the entities from: Satya Nadella runs Microsoft.",
+        tools=["extract_entities"],
+    )
     registry = RunRegistry()
     record = await registry.create(request, container)
     assert record.task is not None
     await record.task
     assert record.status == RunStatus.COMPLETED
-    artifact = record.artifacts[0]
-    assert artifact.kind == "structured_output"
-    dumped = artifact.data.model_dump()  # type: ignore[attr-defined]
-    assert set(dumped) >= {"entities", "language", "summary"}
+    step_names = [s.name for s in record.steps if s.type == "tool_call"]
+    assert "extract_entities" in step_names
+    assert record.artifacts[0].kind == "text"
+    assert record.artifacts[0].data
 
 
 async def test_runner_timeout_fails_run(monkeypatch, agent_model) -> None:
