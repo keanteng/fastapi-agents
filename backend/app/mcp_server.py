@@ -14,6 +14,7 @@ from app.agents import tools as tools_module
 from app.agents.registry import load_agent_registry
 from app.agents.skills import dispatch_skill
 from app.core.prompts import get_engine
+from app.search.tools import web_search as _web_search
 
 app = FastMCP("agents")
 
@@ -36,6 +37,12 @@ async def _fetch(url: str, timeout: float = 10.0) -> str:
 def _current_time() -> str:
     """Return the current UTC time as an ISO-8601 string."""
     return tools_module.current_time()
+
+
+@app.tool(name="web_search")
+async def _web_search_tool(query: str, max_results: int = 5) -> str:
+    """Search the web and return JSON results with title, url and snippet."""
+    return await _web_search(query, max_results=max_results)
 
 
 @app.tool(name="dispatch_skill")

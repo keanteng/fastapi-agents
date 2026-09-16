@@ -1,15 +1,31 @@
 import "./style.css";
 import { api, ApiError } from "./api";
+import { icon, prependIcon, replaceIcon } from "./icons";
 import {
   appendError,
+  appendNote,
   appendUserBubble,
   createAssistantTurn,
+  renderEmptyState,
   renderMessages,
   scrollToBottom,
   type AssistantTurn,
   type ToolHandle,
 } from "./render";
 import { attachRunStream } from "./stream";
+import { getTheme, initTheme, toggleTheme } from "./theme";
+import {
+  AlertDialog,
+  Button,
+  DropdownMenu,
+  Sheet,
+  Spinner,
+  cx,
+  el,
+  initToaster,
+  toast,
+  type ToastVariant,
+} from "./ui";
 import type { RunStep, RunStatus } from "./types";
 
 // ----- DOM refs -------------------------------------------------------------
@@ -22,6 +38,9 @@ const fileInput = document.querySelector<HTMLInputElement>("#file-input")!;
 const messagesEl = document.querySelector<HTMLElement>("#messages")!;
 const conversationList = document.querySelector<HTMLElement>("#conversation-list")!;
 const newChatBtn = document.querySelector<HTMLButtonElement>("#new-chat")!;
+const sidebarEl = document.querySelector<HTMLElement>("#sidebar")!;
+const sidebarToggle = document.querySelector<HTMLButtonElement>("#sidebar-toggle")!;
+const themeToggle = document.querySelector<HTMLButtonElement>("#theme-toggle")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const convLabel = document.querySelector<HTMLElement>("#conv-label")!;
 const dropOverlay = document.querySelector<HTMLElement>("#drop-overlay")!;
@@ -37,13 +56,35 @@ let waitingEl: HTMLElement | null = null;
 // True once the server told us the full assistant text (response.output_text.done).
 let textDoneReceived = false;
 
-// ----- Small helpers --------------------------------------------------------
-function setStatus(status: RunStatus | "idle" | "uploading"): void {
-  statusEl.textContent = status;
-  statusEl.className = `status-${status}`;
+const sidebar = Sheet({ panel: sidebarEl });
+
+// ----- Status badge ---------------------------------------------------------
+type StatusKey = RunStatus | "idle" | "uploading";
+
+const STATUS_META: Record<
+  StatusKey,
+  { variant: string; label: string; spinning?: boolean }
+> = {
+  idle: { variant: "outline", label: "idle" },
+  pending: { variant: "default", label: "pending", spinning: true },
+  running: { variant: "default", label: "running", spinning: true },
+  uploading: { variant: "secondary", label: "uploading" },
+  completed: { variant: "success", label: "completed" },
+  failed: { variant: "destructive", label: "failed" },
+  cancelled: { variant: "warning", label: "cancelled" },
+};
+
+function setStatus(status: StatusKey): void {
+  const meta = STATUS_META[status];
+  statusEl.className = `badge badge-${meta.variant}`;
+  statusEl.dataset.status = status;
+  statusEl.replaceChildren();
+  if (meta.spinning) statusEl.append(icon("loader", 12));
+  statusEl.append(document.createTextNode(meta.label));
   stopBtn.hidden = !(status === "running" || status === "pending");
 }
 
+// ----- Small helpers --------------------------------------------------------
 function scrollBottom(): void {
   scrollToBottom(messagesEl);
 }
@@ -52,10 +93,50 @@ function shortId(id: string): string {
   return id.length > 10 ? `${id.slice(0, 8)}…` : id;
 }
 
+function messageOf(err: unknown): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function notify(
+  title: string,
+  variant: ToastVariant = "default",
+  description?: string,
+): void {
+  toast(title, { variant, description });
+}
+
 function setComposerEnabled(enabled: boolean): void {
   sendBtn.disabled = !enabled;
   composerInput.disabled = !enabled;
   attachBtn.disabled = !enabled;
+}
+
+// ----- Theme ----------------------------------------------------------------
+function renderThemeToggle(): void {
+  const dark = getTheme() === "dark";
+  replaceIcon(themeToggle, dark ? "sun" : "moon");
+  const label = dark ? "Switch to light theme" : "Switch to dark theme";
+  themeToggle.title = label;
+  themeToggle.setAttribute("aria-label", label);
+}
+
+function initChrome(): void {
+  initTheme();
+  renderThemeToggle();
+  initToaster();
+
+  prependIcon(newChatBtn, "plus");
+  prependIcon(attachBtn, "paperclip");
+  prependIcon(sendBtn, "send");
+  prependIcon(stopBtn, "square");
+  prependIcon(sidebarToggle, "panel-left");
+
+  const brand = document.querySelector<HTMLElement>(".sidebar-brand");
+  if (brand) prependIcon(brand, "sparkles", 18);
+  const upload = document.querySelector<HTMLElement>(".sidebar-upload");
+  if (upload) prependIcon(upload, "file", 15);
 }
 
 // ----- Conversation sidebar -------------------------------------------------
@@ -82,43 +163,60 @@ function renderConversationList(): void {
   void api
     .conversations()
     .then((list) => {
+      if (list.length === 0) {
+        conversationList.append(
+          el("li", {
+            class: "conversation-empty",
+            text: "No conversations yet",
+          }),
+        );
+      }
       for (const conv of list) {
-        const item = document.createElement("li");
-        item.className =
-          conv.conversation_id === activeConversationId
-            ? "conversation-item active"
-            : "conversation-item";
+        const item = el("li", {
+          class: cx(
+            "conversation-item",
+            conv.conversation_id === activeConversationId && "active",
+          ),
+        });
 
-        const open = document.createElement("button");
-        open.type = "button";
-        open.className = "conversation-open";
-        open.title = new Date(conv.updated_at).toLocaleString();
+        const open = el("button", {
+          class: "conversation-open",
+          attrs: {
+            type: "button",
+            title: new Date(conv.updated_at).toLocaleString(),
+          },
+        });
+        open.append(
+          el("span", {
+            class: "conv-preview",
+            text: conv.preview?.replace(/\s+/g, " ") || "(empty conversation)",
+          }),
+          el("span", {
+            class: "conv-time",
+            text: relativeTime(conv.updated_at),
+          }),
+        );
         open.addEventListener("click", () =>
           void openConversation(conv.conversation_id),
         );
 
-        const preview = document.createElement("span");
-        preview.className = "conv-preview";
-        preview.textContent =
-          conv.preview?.replace(/\s+/g, " ") || "(empty conversation)";
-
-        const time = document.createElement("span");
-        time.className = "conv-time";
-        time.textContent = relativeTime(conv.updated_at);
-
-        open.append(preview, time);
-
-        const del = document.createElement("button");
-        del.type = "button";
-        del.className = "conversation-delete";
-        del.textContent = "×";
-        del.title = "Delete conversation";
-        del.addEventListener("click", (event) => {
-          event.stopPropagation();
-          void deleteConversation(conv.conversation_id);
+        const menuTrigger = Button({
+          variant: "ghost",
+          size: "icon-sm",
+          icon: "ellipsis",
+          class: "conversation-menu",
+          title: "Conversation actions",
         });
+        const menu = DropdownMenu(menuTrigger, [
+          {
+            label: "Delete",
+            icon: "trash",
+            variant: "destructive",
+            onSelect: () => confirmDeleteConversation(conv.conversation_id),
+          },
+        ]);
 
-        item.append(open, del);
+        item.append(open, menu.element);
         conversationList.append(item);
       }
     })
@@ -130,6 +228,7 @@ function renderConversationList(): void {
 
 async function openConversation(conversationId: string): Promise<void> {
   if (busy) return;
+  sidebar.close();
   activeConversationId = conversationId;
   currentRunId = null;
   messagesEl.textContent = "";
@@ -145,28 +244,43 @@ async function openConversation(conversationId: string): Promise<void> {
   renderConversationList();
 }
 
+function confirmDeleteConversation(conversationId: string): void {
+  AlertDialog({
+    title: "Delete conversation?",
+    description:
+      "This permanently removes the conversation and all of its messages.",
+    confirmLabel: "Delete",
+    destructive: true,
+    onConfirm: () => void deleteConversation(conversationId),
+  });
+}
+
 async function deleteConversation(conversationId: string): Promise<void> {
   try {
     await api.deleteConversation(conversationId);
+    notify("Conversation deleted", "success");
   } catch (err) {
     appendError(messagesEl, `Failed to delete conversation: ${messageOf(err)}`);
+    notify("Failed to delete conversation", "error", messageOf(err));
   }
   if (activeConversationId === conversationId) {
     activeConversationId = null;
-    messagesEl.textContent = "";
+    renderEmptyState(messagesEl);
   }
   renderConversationList();
 }
 
 function startNewChat(): void {
   if (busy) return;
+  sidebar.close();
   activeConversationId = null;
   currentRunId = null;
-  messagesEl.textContent = "";
   streamTurn = null;
   openTools.clear();
   convLabel.textContent = "none";
+  renderEmptyState(messagesEl);
   renderConversationList();
+  composerInput.focus();
 }
 
 // ----- Transcript rebuild after a run finishes ------------------------------
@@ -196,16 +310,13 @@ async function sendMessage(text: string, attachment?: string): Promise<void> {
 
   const bubble = appendUserBubble(messagesEl, trimmed);
   if (attachment) {
-    const chip = document.createElement("div");
-    chip.className = "msg-attach";
-    chip.textContent = `file: ${attachment}`;
+    const chip = el("div", { class: "msg-attach", text: `file: ${attachment}` });
     bubble.append(chip);
   }
   streamTurn = createAssistantTurn(messagesEl);
-  waitingEl = document.createElement("div");
-  waitingEl.className = "assistant-wait";
-  waitingEl.textContent = "Agent is working…";
-  streamTurn.element.append(waitingEl);
+  waitingEl = el("div", { class: "assistant-wait" });
+  waitingEl.append(Spinner(14), document.createTextNode("Agent is working…"));
+  streamTurn.body.append(waitingEl);
   scrollBottom();
 
   const dismissWaiting = (): void => {
@@ -254,6 +365,7 @@ async function sendMessage(text: string, attachment?: string): Promise<void> {
   } catch (err) {
     dismissWaiting();
     streamTurn?.addError(`Run failed to start: ${messageOf(err)}`);
+    notify("Run failed to start", "error", messageOf(err));
     busy = false;
     setComposerEnabled(true);
     setStatus("failed");
@@ -289,13 +401,16 @@ async function handleTerminal(run: {
   openTools.clear();
 
   if (run.status === "failed") {
-    streamTurn?.addError(
-      run.error ? `Run failed (${run.error.code}): ${run.error.message}` : "Run failed.",
-    );
+    const detail = run.error
+      ? `Run failed (${run.error.code}): ${run.error.message}`
+      : "Run failed.";
+    streamTurn?.addError(detail);
+    notify("Run failed", "error", run.error?.message);
     return;
   }
   if (run.status === "cancelled") {
     streamTurn?.addError("Run cancelled.");
+    notify("Run cancelled", "warning");
     return;
   }
 
@@ -307,7 +422,7 @@ async function handleTerminal(run: {
     // reply is never missing.
     await refreshTranscript();
   }
-  if (run.note) note(run.note);
+  if (run.note) appendNote(messagesEl, run.note);
   renderConversationList();
   composerInput.focus();
 }
@@ -324,21 +439,13 @@ async function cancelRun(): Promise<void> {
 }
 
 // ----- Uploads --------------------------------------------------------------
-function note(text: string): void {
-  const node = document.createElement("div");
-  node.className = "msg system";
-  node.textContent = text;
-  messagesEl.append(node);
-  scrollBottom();
-}
-
 async function handleFile(file: File): Promise<void> {
   if (busy || !file) return;
   const typed = composerInput.value.trim();
   composerInput.value = "";
   autoResize(composerInput);
   setStatus("uploading");
-  note(`Uploading ${file.name}…`);
+  notify(`Uploading ${file.name}…`);
   try {
     const upload = await api.upload(file);
     const fileRef = `attached file "${upload.file_name}" (upload id ${upload.upload_id})`;
@@ -347,19 +454,13 @@ async function handleFile(file: File): Promise<void> {
       : `The user uploaded ${fileRef} but gave no instructions. Read the file, ` +
         `summarise it, and offer next steps such as answering questions, ` +
         `extracting entities, or running a compliance/PII check.`;
-    note(`Uploaded ${upload.file_name}.`);
+    notify(`Uploaded ${upload.file_name}`, "success");
     await sendMessage(prompt, upload.file_name);
   } catch (err) {
-    note(`Upload failed: ${messageOf(err)}`);
+    appendError(messagesEl, `Upload failed: ${messageOf(err)}`);
+    notify("Upload failed", "error", messageOf(err));
     setStatus("failed");
   }
-}
-
-// ----- Errors ---------------------------------------------------------------
-function messageOf(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  if (err instanceof Error) return err.message;
-  return String(err);
 }
 
 // ----- Wiring ---------------------------------------------------------------
@@ -369,15 +470,26 @@ function autoResize(textarea: HTMLTextAreaElement): void {
 }
 
 function init(): void {
+  initChrome();
+
   // Surface unexpected JS errors in the transcript so bugs are never silent.
   window.addEventListener("unhandledrejection", (event) => {
     console.error("Unhandled rejection:", event.reason);
-    note(`Unexpected error: ${messageOf(event.reason)}`);
+    appendError(messagesEl, `Unexpected error: ${messageOf(event.reason)}`);
+    notify("Unexpected error", "error", messageOf(event.reason));
   });
   window.addEventListener("error", (event) => {
     console.error("Uncaught error:", event.error ?? event.message);
-    note(`Unexpected error: ${event.message}`);
+    appendError(messagesEl, `Unexpected error: ${event.message}`);
+    notify("Unexpected error", "error", event.message);
   });
+
+  themeToggle.addEventListener("click", () => {
+    toggleTheme();
+    renderThemeToggle();
+  });
+  sidebarToggle.addEventListener("click", () => sidebar.toggle());
+  newChatBtn.addEventListener("click", startNewChat);
 
   composerForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -387,7 +499,6 @@ function init(): void {
     void sendMessage(text);
   });
   stopBtn.addEventListener("click", () => void cancelRun());
-  newChatBtn.addEventListener("click", startNewChat);
   composerInput.addEventListener("input", () => autoResize(composerInput));
   composerInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -425,7 +536,9 @@ function init(): void {
     if (file) void handleFile(file);
   });
 
+  setStatus("idle");
   void renderConversationList();
+  renderEmptyState(messagesEl);
   composerInput.focus();
 }
 

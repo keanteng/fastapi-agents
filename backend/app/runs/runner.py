@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
 )
 
 from app.agents.memory.repository import MemoryRepository
+from app.core import metrics
 from app.core.config import settings
 from app.core.db import get_session_maker
 from app.runs.events import (
@@ -103,6 +104,24 @@ def classify_error(exc: Exception) -> tuple[str, str]:
         "exceeded max retries count" in message and "Tool" in message
     ):
         return "tool_error", f"tool call failed after retries: {message}"
+    lowered = message.lower()
+    if any(token in lowered for token in ("rate limit", "429", "too many requests")):
+        return "model_rate_limited", message
+    if any(
+        token in lowered
+        for token in ("unauthorized", "authentication", "invalid api key", "401", "403")
+    ):
+        return "model_auth_error", message
+    if any(
+        token in lowered
+        for token in (
+            "context length",
+            "maximum context",
+            "context_length_exceeded",
+            "too many tokens",
+        )
+    ):
+        return "context_length_exceeded", message
     return "model_error", message
 
 
@@ -176,22 +195,27 @@ async def execute_run(
 ) -> None:
     """The asyncio task body for a single run (§8.1)."""
     definition = container.agents.definitions[request.agent]
-
-    async with registry.lock:
-        if record.status == RunStatus.CANCELLED:
-            return  # cancelled before the task started; cancel() emitted the terminal event
-        if definition.uses_memory and record.conversation_id is None:
-            record.conversation_id = uuid.uuid4().hex
-        record.status = RunStatus.RUNNING
-        record.started_at = now_utc()
-
-    await registry.emit(
-        record,
-        "response.created",
-        created_data(record.agent, record.conversation_id, request.input),
-    )
+    started = False
 
     try:
+        async with registry.lock:
+            if record.status == RunStatus.CANCELLED:
+                # Cancelled before the task started; cancel() already emitted the
+                # terminal event.
+                return
+            if definition.uses_memory and record.conversation_id is None:
+                record.conversation_id = uuid.uuid4().hex
+            record.status = RunStatus.RUNNING
+            record.started_at = now_utc()
+            started = True
+            metrics.run_started()
+
+        await registry.emit(
+            record,
+            "response.created",
+            created_data(record.agent, record.conversation_id, request.input),
+        )
+        await registry.persist(record)
         await _execute_agent(record, registry, container, request, definition)
     except asyncio.CancelledError:
         pass  # a cancel request raced us; the finally block emits run.cancelled
@@ -211,10 +235,14 @@ async def execute_run(
         await _fail(record, registry, error)
     finally:
         async with registry.lock:
-            if record.status == RunStatus.CANCELLED:
+            if started and record.status == RunStatus.CANCELLED:
                 # The run was cancelled mid-flight; no terminal event yet.
                 registry._emit_locked(record, "run.cancelled", cancelled_data())
             record.task = None
+        if started:
+            metrics.run_finished()
+            metrics.observe_run_status(record.agent, record.status.value)
+        await registry.persist(record)
 
 
 async def _execute_agent(
@@ -312,6 +340,7 @@ async def _complete(
             "response.completed",
             completed_data(record.status.value, usage, artifacts),
         )
+    await registry.persist(record)
 
 
 async def _fail(record: RunRecord, registry: "RunRegistry", error: ErrorBody) -> None:
@@ -322,6 +351,7 @@ async def _fail(record: RunRecord, registry: "RunRegistry", error: ErrorBody) ->
         record.finished_at = now_utc()
         record.error = error
         registry._emit_locked(record, "response.failed", failed_data(error))
+    await registry.persist(record)
 
 
 async def _load_history(conversation_id: str | None) -> list[Any]:

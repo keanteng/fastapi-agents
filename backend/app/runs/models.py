@@ -89,6 +89,11 @@ class RunRecord:
         self.run_id = run_id
         self.agent = agent
         self.conversation_id = conversation_id
+        self.input: str = ""
+        self.tools: list[str] | None = None
+        self.capabilities: list[str] | None = None
+        self.max_steps: int | None = None
+        self.idempotency_key: str | None = None
         self.metadata: dict | None = None
         self.status: RunStatus = RunStatus.PENDING
         self.created_at: datetime = datetime.now(timezone.utc)
@@ -99,6 +104,7 @@ class RunRecord:
         self.usage: RunUsage | None = None
         self.error: ErrorBody | None = None
         self.note: str | None = None
+        self.request: Any | None = None
         self.task: asyncio.Task | None = None
         self.events: deque["RunEvent"] = deque(maxlen=EVENT_LOG_MAXLEN)
         self.event_ready: asyncio.Event = asyncio.Event()

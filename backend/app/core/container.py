@@ -10,6 +10,7 @@ from app.core.config import Settings
 from app.core.model import get_model
 from app.core.prompts import PromptEngine
 from app.runs.registry import RunRegistry
+from app.runs.store import RunStore
 
 
 @dataclass
@@ -35,7 +36,11 @@ def build_container(config: Settings | None = None) -> AppContainer:
         model=get_model(),
         prompts=PromptEngine(),
         agents=load_agent_registry(),
-        runs=RunRegistry(),
+        runs=RunRegistry(
+            RunStore(),
+            max_concurrent=resolved.run_max_concurrent,
+            queue_max=resolved.run_queue_max,
+        ),
     )
     _container = container
     return container

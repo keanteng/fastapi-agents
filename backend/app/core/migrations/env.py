@@ -25,6 +25,7 @@ from app.core.db import Base
 
 # Import every slice's models module here so ``Base.metadata`` includes them.
 from app.agents.memory import models as _memory_models  # noqa: F401
+from app.runs import orm as _runs_orm  # noqa: F401
 
 # Ensure the project root is importable when alembic runs from any cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))

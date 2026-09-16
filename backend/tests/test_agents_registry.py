@@ -22,6 +22,7 @@ def test_registry_tools_include_shared_and_delegation() -> None:
         "calculator",
         "fetch",
         "current_time",
+        "web_search",
         "dispatch_skill",
         "delegate_chat",
         "delegate_tools",

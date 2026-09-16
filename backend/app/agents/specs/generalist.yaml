@@ -5,7 +5,7 @@ model: null
 output_type: string
 output_schema: null
 capabilities: [thinking]
-tools: [calculator, fetch, current_time, dispatch_skill,
+tools: [calculator, fetch, current_time, web_search, dispatch_skill,
         delegate_chat, delegate_tools, delegate_skill,
         document_text, check_compliance, extract_entities]
 uses_memory: true

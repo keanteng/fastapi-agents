@@ -12,22 +12,24 @@ def make_delegate_tools(build_agent: Callable) -> dict[str, Callable]:
     (no delegation), so delegation cannot recurse.
     """
 
+    base_tools = [
+        "calculator",
+        "fetch",
+        "current_time",
+        "web_search",
+        "dispatch_skill",
+    ]
+
     async def delegate_chat(subtask: str) -> str:
         """Delegate a general conversational sub-task to a fresh generalist."""
-        agent = build_agent(
-            "generalist",
-            tools=["calculator", "fetch", "current_time", "dispatch_skill"],
-        )
+        agent = build_agent("generalist", tools=base_tools)
         async with agent:
             result = await agent.run(subtask)
         return result.output
 
     async def delegate_tools(subtask: str) -> str:
         """Delegate a tool-needing sub-task to a fresh generalist."""
-        agent = build_agent(
-            "generalist",
-            tools=["calculator", "fetch", "current_time", "dispatch_skill"],
-        )
+        agent = build_agent("generalist", tools=base_tools)
         async with agent:
             result = await agent.run(subtask)
         return result.output

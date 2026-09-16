@@ -23,6 +23,7 @@ class AppError(Exception):
         *,
         details=None,
         run_id: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
@@ -30,6 +31,7 @@ class AppError(Exception):
         self.message = message
         self.details = details
         self.run_id = run_id
+        self.headers = headers
 
 
 def register_error_handlers(app: FastAPI) -> None:
@@ -46,6 +48,7 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": body.model_dump(mode="json")},
+            headers=exc.headers,
         )
 
     @app.exception_handler(RequestValidationError)

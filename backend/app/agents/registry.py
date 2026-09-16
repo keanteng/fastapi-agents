@@ -26,6 +26,7 @@ class AgentRegistry:
     def _init_tools(self) -> None:
         from app.agents import extraction, tools as tools_module
         from app.documents.tools import make_document_tools
+        from app.search.tools import make_search_tools
 
         self.tools = {
             "calculator": tools_module.calculator,
@@ -34,6 +35,7 @@ class AgentRegistry:
             "dispatch_skill": dispatch_skill,
             "extract_entities": extraction.extract_entities,
         }
+        self.tools.update(make_search_tools())
         self.tools.update(make_delegate_tools(self.build_agent))
         self.tools.update(make_document_tools())
 

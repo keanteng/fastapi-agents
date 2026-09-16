@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,44 +8,83 @@
   </head>
   <body>
     <div id="drop-overlay" hidden>
-      <p>Drop a file to attach it for reading, extraction or a compliance check</p>
+      <div class="drop-card">
+        <span>Drop a file to attach it for reading, extraction or a compliance check</span>
+      </div>
     </div>
 
     <div class="app">
-      <aside class="sidebar">
-        <div class="sidebar-top">
-          <h1>Agents</h1>
-          <button id="new-chat" type="button" class="primary">+ New chat</button>
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-brand">
+            <span>Agents</span>
+          </div>
+          <button id="new-chat" type="button" class="btn btn-default">New chat</button>
         </div>
+
         <div class="sidebar-upload">
-          <button id="attach" type="button">Attach file</button>
-          <span>attach a file and I'll read, extract or check it</span>
+          <span>Attach a file and I'll read, extract or check it</span>
         </div>
-        <ul id="conversation-list" class="conversation-list"></ul>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-label">Conversations</div>
+          <ul id="conversation-list" class="conversation-list"></ul>
+        </div>
       </aside>
 
       <main class="chat">
         <header class="chat-head">
+          <button
+            id="sidebar-toggle"
+            type="button"
+            class="btn btn-ghost btn-icon"
+            title="Toggle sidebar"
+          ></button>
           <span class="meta-pill">conv <span id="conv-label">none</span></span>
-          <span id="status" class="status-idle">idle</span>
-          <button id="stop" type="button" hidden>Stop</button>
+          <div class="chat-head-actions">
+            <span id="status" class="badge badge-outline" data-status="idle">idle</span>
+            <button id="stop" type="button" class="btn btn-destructive btn-sm" hidden>
+              Stop
+            </button>
+            <button
+              id="theme-toggle"
+              type="button"
+              class="btn btn-ghost btn-icon"
+              title="Toggle theme"
+            ></button>
+          </div>
         </header>
 
-        <section id="messages" aria-live="polite"></section>
+        <section id="messages" class="messages" aria-live="polite"></section>
 
         <footer class="composer">
-          <form id="composer-form">
+          <form id="composer-form" class="composer-form">
             <textarea
               id="composer-input"
+              class="textarea composer-input"
               rows="1"
               placeholder="Ask anything — attach a file and I'll decide how to help"
             ></textarea>
-            <button id="composer-send" type="submit" class="primary">Send</button>
+            <div class="composer-actions">
+              <button
+                id="attach"
+                type="button"
+                class="btn btn-ghost btn-icon"
+                title="Attach file"
+              ></button>
+              <button
+                id="composer-send"
+                type="submit"
+                class="btn btn-default btn-icon"
+                title="Send"
+              ></button>
+            </div>
           </form>
         </footer>
       </main>
     </div>
 
+    <div id="toaster" class="toaster" aria-live="polite" aria-atomic="true"></div>
     <input id="file-input" type="file" hidden />
     <script type="module" src="/src/main.ts"></script>
   </body>

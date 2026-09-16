@@ -22,20 +22,27 @@ Browse http://localhost:8000/docs.
 
 ## Endpoints
 
+All `/api/v1/*` routes require an `X-API-Key` header when `AUTH_ENABLED=true`,
+and are rate limited per key/client IP. Liveness/readiness probes are always
+open.
+
 | Method | Path                        | Purpose                      | Success | Errors           |
 |--------|-----------------------------|------------------------------|---------|------------------|
-| POST   | /api/v1/runs                | Create a run                 | 202     | 422              |
-| GET    | /api/v1/runs                | List runs (newest first)     | 200     | —                |
+| GET    | /health                     | Liveness probe               | 200     | —                |
+| GET    | /ready                      | Readiness probe (DB check)   | 200     | 503              |
+| GET    | /metrics                    | Prometheus metrics           | 200     | 404 (disabled)   |
+| POST   | /api/v1/runs                | Create a run                 | 202     | 401, 422, 429    |
+| GET    | /api/v1/runs                | List runs (newest first)     | 200     | 401, 429         |
 | GET    | /api/v1/runs/{run_id}       | Run status/steps/artifacts   | 200     | 404              |
 | GET    | /api/v1/runs/{run_id}/events| SSE event stream             | 200     | 404, 409         |
 | POST   | /api/v1/runs/{run_id}/cancel| Cancel a run                 | 202     | 404, 409         |
-| GET    | /api/v1/agents              | List declarative agent specs | 200     | —                |
+| GET    | /api/v1/agents              | List declarative agent specs | 200     | 401, 429         |
 | GET    | /api/v1/agents/{name}       | Single agent spec            | 200     | 404              |
-| GET    | /api/v1/conversations       | List conversations (newest first) | 200 | —             |
+| GET    | /api/v1/conversations       | List conversations (newest first) | 200 | 401, 429     |
 | GET    | /api/v1/conversations/{id}  | Conversation transcript as DTOs | 200 | 404          |
 | DELETE | /api/v1/conversations/{id}  | Delete a conversation        | 204     | 404              |
-| POST   | /api/v1/uploads             | Upload a file (returns sha1 id) | 201 | 413, 422       |
-| GET    | /api/v1/uploads/{id}        | Upload metadata              | 200     | 404              |
+| POST   | /api/v1/uploads             | Upload a file (returns sha1 id) | 201 | 401, 413, 422, 429 |
+| GET    | /api/v1/uploads/{id}        | Upload metadata              | 200     | 403, 404         |
 
 The old endpoint namespaces (`/api/v1/chat*`, `/api/v1/memory*`,
 `/api/v1/tools`, `/api/v1/skills`, `/api/v1/tasks`, `/api/v1/extract`) are
@@ -149,7 +156,10 @@ curl -i -X POST http://localhost:8000/api/v1/uploads \
 
 Uploads are stored under `UPLOAD_DIR` keyed by the sha1 of their bytes (so
 re-uploading identical content returns the same id). Allowed types: `pdf`,
-`docx`, `txt`, `md`, `png`, `jpg`, `jpeg`, `webp`.
+`docx`, `txt`, `md`, `png`, `jpg`, `jpeg`, `webp`. The upload records the API
+key that created it; `GET /api/v1/uploads/{id}` returns `403 upload_forbidden`
+for a different key. A background janitor deletes uploads older than
+`UPLOAD_TTL_SECONDS` (set `0` to disable).
 
 The **generalist** agent exposes three document/text tools:
 
@@ -173,6 +183,17 @@ enabled with `DOC_VISION_ENABLED` and gated behind `DOC_MAX_VISION_PAGES`;
 sensitive-data rules live in `app/documents/rules.py` and can be extended via
 an optional `COMPLIANCE_RULES_PATH` YAML file (`rules:` list).
 
+## Web search
+
+The generalist has a free `web_search(query, max_results=5)` tool backed by
+DuckDuckGo (via `ddgs`) — no API key or extra infrastructure. Results are
+returned as `{title, url, snippet}` JSON, and the agent is instructed to cite
+its sources. Repeated queries are served from a bounded in-process TTL cache,
+which is what keeps the free backend from rate-limiting; on a rate limit or
+timeout the tool degrades to an empty result set (with a `note`) instead of
+failing the run. Tune with `SEARCH_PROVIDER`, `SEARCH_MAX_RESULTS`,
+`SEARCH_TIMEOUT_SECONDS`, and `SEARCH_CACHE_TTL_SECONDS`.
+
 ## Run lifecycle
 
 ```
@@ -182,8 +203,19 @@ pending ──► running ──► completed
               └────► cancelled (cancel request from pending or running)
 ```
 
-Runs live **in memory** and die with the process: there is no run persistence
-and no queue. Treat `404 run_not_found` after a restart as "the run is gone".
+Every state change is written through to the `runs` table, so runs survive a
+restart and `GET /api/v1/runs` reflects history. In-flight runs cannot resume,
+though: on startup the app marks any run left `pending`/`running` by a dead
+process as `failed` with error code `interrupted`.
+
+Runs are dispatched to a bounded worker pool (`RUN_MAX_CONCURRENT`), and
+submissions beyond `RUN_QUEUE_MAX` waiting runs are rejected with
+`429 queue_full`. The in-memory SSE event log is still per-process, so a run
+executed by a different instance is retrievable via polling but has no event
+stream to replay.
+
+`POST /api/v1/runs` accepts an optional `idempotency_key`; resubmitting the
+same key returns the original run instead of starting a new one.
 
 ## Errors
 
@@ -193,11 +225,14 @@ Every error response uses one envelope:
 { "error": { "code": "…", "message": "…", "details": null, "run_id": null } }
 ```
 
-Codes: `validation_error` (422), `unknown_agent` (422), `run_not_found` (404),
-`agent_not_found` (404), `sse_busy` (409), `cancel_conflict` (409),
-`internal_error` (500). Run-level failures are recorded in the run's `error`
-field and the `response.failed` event with codes `timeout`, `model_error`, or
-`tool_error`.
+HTTP codes: `validation_error` (422), `unauthorized` (401), `rate_limited`
+(429, with `Retry-After`), `queue_full` (429), `unknown_agent` (422),
+`run_not_found` (404), `agent_not_found` (404), `upload_forbidden` (403),
+`sse_busy` (409), `cancel_conflict` (409), `not_ready` (503), `internal_error`
+(500). Run-level failures are recorded in the run's `error` field and the
+`response.failed` event with codes `timeout`, `tool_error`, `interrupted`,
+`model_rate_limited`, `model_auth_error`, `context_length_exceeded`, or
+`model_error`.
 
 ## MCP server
 
@@ -211,8 +246,8 @@ uv run python -m app.mcp_server
 
 Exposed surface:
 
-- **Tools:** `calculator(expression)`, `fetch(url)`, `current_time()`,
-  `dispatch_skill(skill_name, input_text)`.
+- **Tools:** `calculator(expression)`, `fetch(url)`, `web_search(query,
+  max_results)`, `current_time()`, `dispatch_skill(skill_name, input_text)`.
 - **Prompts:** `summarizer(text)`, `translator(text, target_language)`,
   `code_reviewer(code)`.
 - **Resource:** `agents://catalog` — JSON listing every agent spec.
@@ -247,12 +282,36 @@ spec fails fast. The registry (`app/agents/registry.py`) resolves them into
 pydantic-ai agents with `tools=` registration, capabilities, and output
 schemas.
 
+## Production hardening
+
+- **Auth** — `AUTH_ENABLED=true` requires a valid `X-API-Key` on every
+  `/api/v1/*` route; keys come from the comma-separated `API_KEYS`.
+- **Rate limiting** — per key/client-IP token bucket (`RATE_LIMIT_REQUESTS` per
+  `RATE_LIMIT_WINDOW_SECONDS`), returning `429` with `Retry-After`.
+- **Runs** — persisted to the `runs` table, executed by a bounded worker pool,
+  reconciled on startup, and optionally idempotent (see above).
+- **Observability** — structured JSON logs with a request id (`LOG_JSON`),
+  `X-Request-ID`/`X-Process-Time-Ms` response headers, `/health`, `/ready`, and
+  Prometheus `/metrics` (`METRICS_ENABLED`). Set `OTEL_ENABLED=true` to export
+  traces via logfire/OpenTelemetry.
+- **Reliability** — `MODEL_RETRIES` pydantic-ai retries and an optional
+  OpenAI-compatible fallback model (`MODEL_FALLBACK*`); typed run error codes.
+
+## Running with Docker
+
+```bash
+# from the repo root; uses backend/.env
+docker compose up --build        # api on :8000 + postgres
+```
+
+The image installs `poppler-utils` and `tesseract-ocr` for document tools.
+
 ## Database
 
-Conversation memory is persisted in Postgres via async SQLAlchemy (`asyncpg`)
-with Alembic migrations; the schema is unchanged. Tests use an in-memory
-SQLite engine (`tests/conftest.py`), so they need no running Postgres.
-Migrations live in `app/core/migrations`.
+Conversation memory and runs are persisted in Postgres via async SQLAlchemy
+(`asyncpg`) with Alembic migrations. Tests use a file-backed SQLite engine
+(`tests/conftest.py`), so they need no running Postgres. Migrations live in
+`app/core/migrations` (`27b4cda3bb5a` memory, `8f3a1c9d2b47` runs).
 
 ## Tests
 
@@ -260,5 +319,5 @@ Migrations live in `app/core/migrations`.
 uv run pytest
 ```
 
-Powered by pydantic-ai `TestModel`/`ScriptedTestModel`, in-memory SQLite, and
-a stubbed `http_fetch` — no network calls.
+Powered by pydantic-ai `TestModel`/`ScriptedTestModel`, file-backed SQLite, and
+stubbed `http_fetch`/`web_search` — no network calls.

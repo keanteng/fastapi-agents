@@ -9,6 +9,7 @@ from pydantic_ai.capabilities.thinking import Thinking
 from app.agents.definitions import AgentDefinition
 from app.agents.models.extraction import ExtractionResult
 from app.agents.tools import tool_adapter
+from app.core.config import settings
 from app.core.model import get_model
 from app.core.prompts import render
 
@@ -64,4 +65,5 @@ def build_agent(
         tools=registered_tools,
         capabilities=resolve_capabilities(definition, capabilities),
         name=definition.name,
+        retries=settings.model_retries,
     )

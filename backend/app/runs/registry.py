@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from app.core import metrics
 from app.runs.events import RunEvent, cancelled_data, ping_data, step_data
 from app.runs.models import (
     RunRecord,
     RunStatus,
     TERMINAL_STATUSES,
 )
+from app.runs.store import RunStore
+
+logger = logging.getLogger(__name__)
 
 SSE_PING_INTERVAL = 15.0
 
@@ -37,47 +42,119 @@ class SseBusyError(Exception):
         self.run_id = run_id
 
 
-class RunRegistry:
-    """In-memory run registry. All mutations happen under a single lock."""
+class QueueFullError(Exception):
+    """Raised when the bounded run queue is at capacity."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_size: int) -> None:
+        super().__init__(f"run queue is full (max {max_size})")
+        self.max_size = max_size
+
+
+class RunRegistry:
+    """Live run registry with write-through persistence and a worker pool.
+
+    All in-memory mutations happen under a single lock. When a ``store`` is
+    supplied, every state change is written through to the database. When
+    ``max_concurrent`` is positive, runs are dispatched to a bounded worker
+    pool instead of spawning an unbounded task per request.
+    """
+
+    def __init__(
+        self,
+        store: RunStore | None = None,
+        *,
+        max_concurrent: int = 0,
+        queue_max: int = 0,
+    ) -> None:
         self._records: dict[str, RunRecord] = {}
         self.lock = asyncio.Lock()
+        self._store = store
+        self._max_concurrent = max_concurrent
+        self._queue_max = queue_max
+        self._queue: asyncio.Queue[tuple[RunRecord, Any, Any]] = asyncio.Queue()
+        self._workers: list[asyncio.Task] = []
+        self._closing = False
 
     def register(self, record: RunRecord) -> None:
         """Insert a pre-built record (tests and direct callers)."""
         self._records[record.run_id] = record
 
     async def create(self, request: Any, container: Any) -> RunRecord:
-        """Create a pending run and schedule its background task."""
+        """Create a pending run and dispatch it.
+
+        With ``max_concurrent <= 0`` the run starts as a dedicated task (the
+        historical behaviour); otherwise it is queued for the worker pool.
+        """
         record = RunRecord(
             run_id=uuid.uuid4().hex,
             agent=request.agent,
             conversation_id=request.conversation_id,
         )
+        record.input = request.input
+        record.tools = request.tools
+        record.capabilities = request.capabilities
+        record.max_steps = request.max_steps
+        record.idempotency_key = getattr(request, "idempotency_key", None)
         record.metadata = request.metadata
+        record.request = request
         async with self.lock:
             self._records[record.run_id] = record
-        from app.runs.runner import execute_run  # local import avoids a cycle
+        await self.persist(record)
 
-        task = asyncio.create_task(execute_run(record, self, container, request))
-        record.task = task
+        if self._max_concurrent > 0:
+            await self._enqueue(record, container, request)
+        else:
+            from app.runs.runner import execute_run  # local import avoids a cycle
+
+            task = asyncio.create_task(execute_run(record, self, container, request))
+            record.task = task
         return record
 
     async def get(self, run_id: str) -> RunRecord:
         async with self.lock:
             record = self._records.get(run_id)
-        if record is None:
-            raise RunNotFoundError(run_id)
-        return record
+        if record is not None:
+            return record
+        if self._store is not None:
+            stored = await self._store.get(run_id)
+            if stored is not None:
+                return stored
+        raise RunNotFoundError(run_id)
 
     async def list(self) -> list[RunRecord]:
         async with self.lock:
-            return sorted(
-                self._records.values(),
-                key=lambda r: r.created_at,
-                reverse=True,
-            )
+            memory = list(self._records.values())
+        if self._store is None:
+            records = memory
+        else:
+            by_id = {record.run_id: record for record in await self._store.list()}
+            by_id.update({record.run_id: record for record in memory})
+            records = list(by_id.values())
+        return sorted(records, key=lambda r: r.created_at, reverse=True)
+
+    async def persist(self, record: RunRecord) -> None:
+        """Write the record snapshot to the store, if one is configured."""
+        if self._store is None:
+            return
+        try:
+            await self._store.save(record)
+        except Exception:  # noqa: BLE001 - persistence must not kill a run
+            logger.exception("failed to persist run %s", record.run_id)
+
+    async def reconcile(self) -> int:
+        """Fail runs orphaned by a previous process (called on startup)."""
+        if self._store is None:
+            return 0
+        return await self._store.reconcile_stale()
+
+    async def find_by_idempotency_key(self, key: str) -> RunRecord | None:
+        if self._store is None or not key:
+            return None
+        async with self.lock:
+            for record in self._records.values():
+                if record.idempotency_key == key:
+                    return record
+        return await self._store.find_by_idempotency_key(key)
 
     async def cancel(self, run_id: str) -> RunRecord:
         """Transition to ``cancelled`` and cancel the run's task (§5.3)."""
@@ -94,12 +171,15 @@ class RunRegistry:
             if not was_running:
                 # Task never started: no runner to emit the terminal event.
                 self._emit_locked(record, "run.cancelled", cancelled_data())
+                metrics.observe_run_status(record.agent, RunStatus.CANCELLED.value)
         if task is not None:
             task.cancel()
+        await self.persist(record)
         return record
 
     async def shutdown(self) -> None:
-        """Cancel every in-flight run task (app shutdown)."""
+        """Cancel every in-flight run and stop the worker pool."""
+        self._closing = True
         async with self.lock:
             tasks = [
                 record.task
@@ -113,6 +193,56 @@ class RunRegistry:
                 await task
             except asyncio.CancelledError:
                 pass
+        for worker in self._workers:
+            worker.cancel()
+        for worker in self._workers:
+            try:
+                await worker
+            except asyncio.CancelledError:
+                pass
+        self._workers.clear()
+
+    # ------------------------------------------------------------------ #
+    # Worker pool
+    # ------------------------------------------------------------------ #
+
+    def _ensure_workers(self) -> None:
+        if self._max_concurrent <= 0 or self._workers:
+            return
+        loop = asyncio.get_running_loop()
+        for _ in range(self._max_concurrent):
+            self._workers.append(loop.create_task(self._worker_loop()))
+
+    async def _enqueue(self, record: RunRecord, container: Any, request: Any) -> None:
+        self._ensure_workers()
+        if 0 < self._queue_max <= self._queue.qsize():
+            async with self.lock:
+                self._records.pop(record.run_id, None)
+            if self._store is not None:
+                await self._store.delete(record.run_id)
+            raise QueueFullError(self._queue_max)
+        self._queue.put_nowait((record, container, request))
+
+    async def _worker_loop(self) -> None:
+        from app.runs.runner import execute_run
+
+        while not self._closing:
+            record, container, request = await self._queue.get()
+            try:
+                if record.status in TERMINAL_STATUSES:
+                    continue
+                record.task = asyncio.current_task()
+                await execute_run(record, self, container, request)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001 - one bad run must not kill a worker
+                logger.exception(
+                    "worker failed on run %s", getattr(record, "run_id", "?")
+                )
+            finally:
+                if hasattr(record, "task"):
+                    record.task = None
+                self._queue.task_done()
 
     # ------------------------------------------------------------------ #
     # Event log
@@ -159,6 +289,7 @@ class RunRegistry:
             step.index = len(record.steps) + 1
             record.steps.append(step)
             self._emit_locked(record, "run.step", step_data(step))
+        await self.persist(record)
 
     async def add_progress(self, record: RunRecord, message: str) -> None:
         """Record a transient pipeline progress line as a ``progress`` step.

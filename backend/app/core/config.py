@@ -30,6 +30,60 @@ class Settings(BaseSettings):
 
     # Runs: wall-clock budget for a single run (seconds).
     run_timeout_seconds: int = Field(default=300, alias="RUN_TIMEOUT_SECONDS")
+    # Maximum runs executing at once; extra runs wait in the in-process queue.
+    run_max_concurrent: int = Field(default=4, alias="RUN_MAX_CONCURRENT")
+    # Maximum queued (accepted but not yet running) runs; further submissions
+    # are rejected with ``429 queue_full``.
+    run_queue_max: int = Field(default=100, alias="RUN_QUEUE_MAX")
+
+    # Authentication. Disabled by default so local dev stays frictionless;
+    # enable and set API_KEYS before exposing the API.
+    auth_enabled: bool = Field(default=False, alias="AUTH_ENABLED")
+    # Comma-separated list of accepted API keys (hashed at rest is a future step).
+    api_keys: str = Field(default="", alias="API_KEYS")
+
+    # Per-client rate limiting (token bucket keyed by API key or client IP).
+    rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
+    rate_limit_requests: int = Field(default=60, alias="RATE_LIMIT_REQUESTS")
+    rate_limit_window_seconds: int = Field(default=60, alias="RATE_LIMIT_WINDOW_SECONDS")
+
+    # Web search (free DuckDuckGo backend by default).
+    search_provider: str = Field(default="duckduckgo", alias="SEARCH_PROVIDER")
+    search_region: str = Field(default="us-en", alias="SEARCH_REGION")
+    search_max_results: int = Field(default=5, alias="SEARCH_MAX_RESULTS")
+    search_timeout_seconds: float = Field(default=10.0, alias="SEARCH_TIMEOUT_SECONDS")
+    search_cache_ttl_seconds: int = Field(
+        default=600, alias="SEARCH_CACHE_TTL_SECONDS"
+    )
+    search_cache_max_entries: int = Field(
+        default=1000, alias="SEARCH_CACHE_MAX_ENTRIES"
+    )
+
+    # Observability.
+    log_json: bool = Field(default=True, alias="LOG_JSON")
+    metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
+    otel_enabled: bool = Field(default=False, alias="OTEL_ENABLED")
+
+    # Uploads: age after which a stored upload is deleted by the janitor.
+    upload_ttl_seconds: int = Field(default=86_400, alias="UPLOAD_TTL_SECONDS")
+
+    # Reliability: pydantic-ai model retries and an optional fallback model
+    # (any OpenAI-compatible endpoint used when the primary model errors).
+    model_retries: int = Field(default=2, alias="MODEL_RETRIES")
+    model_fallback: str | None = Field(default=None, alias="MODEL_FALLBACK")
+    model_fallback_base_url: str | None = Field(
+        default=None, alias="MODEL_FALLBACK_BASE_URL"
+    )
+    model_fallback_api_key: str | None = Field(
+        default=None, alias="MODEL_FALLBACK_API_KEY"
+    )
+
+    @property
+    def api_key_set(self) -> frozenset[str]:
+        """The configured API keys as a set (comma-separated ``API_KEYS``)."""
+        return frozenset(
+            key.strip() for key in self.api_keys.split(",") if key.strip()
+        )
 
     @field_validator("deepseek_api_key", mode="before")
     @classmethod

@@ -8,6 +8,7 @@ from app.api.errors import AppError
 from app.runs.models import RunMessage, RunResponse
 from app.runs.registry import (
     CancelConflictError,
+    QueueFullError,
     RunNotFoundError,
     SseBusyError,
 )
@@ -25,6 +26,7 @@ class CreateRunRequest(BaseModel):
     capabilities: list[str] | None = None
     max_steps: int | None = Field(default=None, ge=1, le=20)
     metadata: dict | None = None
+    idempotency_key: str | None = Field(default=None, max_length=128)
 
 
 @router.post("", status_code=202, response_model=RunResponse)
@@ -40,7 +42,14 @@ async def create_run(body: CreateRunRequest, request: Request) -> RunResponse:
         )
     if body.max_steps is None:
         body.max_steps = definition.default_max_steps
-    record = await container.runs.create(body, container)
+    if body.idempotency_key:
+        existing = await container.runs.find_by_idempotency_key(body.idempotency_key)
+        if existing is not None:
+            return RunResponse.from_record(existing)
+    try:
+        record = await container.runs.create(body, container)
+    except QueueFullError as exc:
+        raise AppError(429, "queue_full", str(exc)) from None
     return RunResponse.from_record(record)
 
 
